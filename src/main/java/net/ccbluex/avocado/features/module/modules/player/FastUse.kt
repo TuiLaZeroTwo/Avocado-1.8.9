@@ -22,13 +22,16 @@ import net.minecraft.network.play.client.C08PacketPlayerBlockPlacement
 import kotlin.random.Random
 
 object FastUse : Module("FastUse", Category.PLAYER) {
-    private val mode by choices("Mode", arrayOf("Instant", "NCP", "AAC", "Custom", "3FMC", "Grim", "1.17Grim"), "Instant")
+    private val mode by choices(
+        "Mode",
+        arrayOf("Instant", "NCP", "AAC", "Custom", "Grim", "1.17Grim"),
+        "Instant"
+    )
 
     private val delay by int("CustomDelay", 0, 0..300) { mode == "Custom" }
     private val customSpeed by int("CustomSpeed", 2, 1..35) { mode == "Custom" }
     private val customTimer by float("CustomTimer", 1.1f, 0.5f..2f) { mode == "Custom" }
     private val noMove by boolean("NoMove", false)
-    private val jitterTimer by boolean("JitterTimer", true) { mode == "3FMC" }
 
     private val msTimer = MSTimer()
     private var usedTimer = false
@@ -54,16 +57,19 @@ object FastUse : Module("FastUse", Category.PLAYER) {
                 }
                 mc.playerController.onStoppedUsingItem(thePlayer)
             }
+
             "ncp" -> if (thePlayer.itemInUseDuration > 14) {
                 repeat(20) {
                     sendPacket(C03PacketPlayer(serverOnGround))
                 }
                 mc.playerController.onStoppedUsingItem(thePlayer)
             }
+
             "aac" -> {
                 mc.timer.timerSpeed = 1.22F
                 usedTimer = true
             }
+
             "custom" -> {
                 mc.timer.timerSpeed = customTimer
                 usedTimer = true
@@ -76,18 +82,22 @@ object FastUse : Module("FastUse", Category.PLAYER) {
                 }
                 msTimer.reset()
             }
-            "3fmc" -> {
-                if ((mc.thePlayer.ticksExisted % 2) == 0) {
-                    repeat(2) {
-                        sendPacket(C03PacketPlayer(serverOnGround))
-                    }
-                }
-            }
+
             "1.17grim" -> {
                 repeat(5) {
-                    sendPacket(C06PacketPlayerPosLook(mc.thePlayer.posX, mc.thePlayer.posY, mc.thePlayer.posZ, mc.thePlayer.rotationYaw, mc.thePlayer.rotationPitch, mc.thePlayer.onGround))
+                    sendPacket(
+                        C06PacketPlayerPosLook(
+                            mc.thePlayer.posX,
+                            mc.thePlayer.posY,
+                            mc.thePlayer.posZ,
+                            mc.thePlayer.rotationYaw,
+                            mc.thePlayer.rotationPitch,
+                            mc.thePlayer.onGround
+                        )
+                    )
                 }
             }
+
             "grim" -> {
                 mc.timer.timerSpeed = 0.49F
                 usedTimer = true
@@ -112,7 +122,6 @@ object FastUse : Module("FastUse", Category.PLAYER) {
 
     val onPacket = handler<PacketEvent> { event ->
         if (event.eventType.name != "SEND") return@handler
-        if (mode.lowercase() != "3fmc" || !jitterTimer) return@handler
 
         val packet = event.packet
         val heldItem = mc.thePlayer?.heldItem?.item ?: return@handler
@@ -136,7 +145,4 @@ object FastUse : Module("FastUse", Category.PLAYER) {
             shouldResetTimer = false
         }
     }
-
-    override val tag: String
-        get() = if (mode.lowercase() == "3fmc" && jitterTimer) "3FMC-Timer" else mode
 }
