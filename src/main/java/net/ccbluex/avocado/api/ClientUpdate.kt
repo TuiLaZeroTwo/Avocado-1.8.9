@@ -20,7 +20,7 @@ object ClientUpdate {
         if (inputStream != null) {
             it.load(inputStream)
         } else {
-            it["git.build.version"] = "B1"
+            it["git.build.version"] = "B1.1"
         }
     }
 
