@@ -30,6 +30,12 @@ object MovementUtils : MinecraftInstance, Listenable {
     var airTicks = 0
     var groundTicks = 0
 
+    var bps = 0.0
+        private set
+    private var lastX = 0.0
+    private var lastY = 0.0
+    private var lastZ = 0.0
+
     @JvmOverloads
     fun strafe(
         speed: Float = MovementUtils.speed, stopWhenNoInput: Boolean = false, moveEvent: MoveEvent? = null,
@@ -81,6 +87,17 @@ object MovementUtils : MinecraftInstance, Listenable {
         xCoord = (-sin(angle) * useSpeed) + prevX
         zCoord = (cos(angle) * useSpeed) + prevZ
         return this
+    }
+
+    fun updateBlocksPerSecond() {
+        if (mc.thePlayer == null || mc.thePlayer.ticksExisted < 1) {
+            bps = 0.0
+        }
+        val distance = mc.thePlayer.getDistance(lastX, lastY, lastZ)
+        lastX = mc.thePlayer.posX
+        lastY = mc.thePlayer.posY
+        lastZ = mc.thePlayer.posZ
+        bps = distance * (20 * mc.timer.timerSpeed)
     }
 
     fun forward(distance: Double) =

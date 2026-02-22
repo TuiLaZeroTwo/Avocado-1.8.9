@@ -11,6 +11,7 @@ import net.minecraft.block.Block
 import net.minecraft.client.gui.GuiScreen
 import net.minecraft.client.multiplayer.WorldClient
 import net.minecraft.entity.Entity
+import net.minecraft.entity.EntityLivingBase
 import net.minecraft.network.Packet
 import net.minecraft.util.*
 
@@ -19,7 +20,7 @@ import net.minecraft.util.*
  *
  * @param targetEntity Attacked entity
  */
-class AttackEvent(val targetEntity: Entity?) : Event()
+class AttackEvent(val targetEntity: Entity) : CancellableEvent()
 
 /**
  * Called when minecraft get bounding box of block
@@ -48,6 +49,13 @@ object ClientShutdownEvent : Event()
  * Called when another entity moves
  */
 data class EntityMovementEvent(val movedEntity: Entity) : Event()
+
+/**
+ * Called when player killed other entity
+ *
+ * @param targetEntity Attacked entity
+ */
+data class EntityKilledEvent(val targetEntity: EntityLivingBase) : Event()
 
 /**
  * Called when player jumps
@@ -254,6 +262,7 @@ internal val ALL_EVENT_CLASSES = arrayOf(
     AttackEvent::class.java,
     BlockPushEvent::class.java,
     Render3DEvent::class.java,
+    EntityKilledEvent::class.java,
     MotionEvent::class.java,
     WorldEvent::class.java,
     DelayedPacketProcessEvent::class.java
