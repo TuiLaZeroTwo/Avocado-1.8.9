@@ -7,7 +7,6 @@ uniform int maxColors;
 uniform vec4 colors[9];
 uniform sampler2D font_texture;
 
-// TODO: Fix Random Stutter
 void main() {
     vec4 texColor = texture2D(font_texture, gl_TexCoord[0].st);
 
@@ -20,7 +19,7 @@ void main() {
     // Divide the range [0, 1] based on maxColors
     float segment = 1.0 / float(maxColors);
     float index = param / segment;
-    float frac = mod(index, 1.0);
+    float frac = fract(index);
 
     float idx1 = floor(index);
     float idx2 = idx1 + 1.0;

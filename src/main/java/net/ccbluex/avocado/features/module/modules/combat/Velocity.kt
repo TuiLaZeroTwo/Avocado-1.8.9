@@ -72,8 +72,10 @@ object Velocity : Module("Velocity", Category.COMBAT) {
     private val range by float("Range", 3.0F, 1F..5.0F) {
         onLook && mode in arrayOf("Reverse", "SmoothReverse")
     }
-    private val maxAngleDifference by float("MaxAngleDifference", 45.0f, 5.0f..90f) {
-        onLook && mode in arrayOf("Reverse", "SmoothReverse")
+
+    private val onlyWhenFacing by boolean("OnlyWhenFacing", false)
+    private val maxAngleDifference by float("MaxAngleDifference", 120.0f, 10.0f..360.0f) {
+        onlyWhenFacing || onLook && mode in arrayOf("Reverse", "SmoothReverse")
     }
 
     // AAC Push
@@ -482,21 +484,22 @@ object Velocity : Module("Velocity", Category.COMBAT) {
         return true
     }
 
-    // TODO: Recode
-    private fun getDirection(): Double {
-        var moveYaw = mc.thePlayer.rotationYaw
+    // Fixed get movement
+    private fun getMovementDirection(): Double {
+        val thePlayer = mc.thePlayer ?: return 0.0
+        var moveYaw = thePlayer.rotationYaw
         when {
-            mc.thePlayer.moveForward != 0f && mc.thePlayer.moveStrafing == 0f -> {
-                moveYaw += if (mc.thePlayer.moveForward > 0) 0 else 180
+            thePlayer.moveForward != 0f && thePlayer.moveStrafing == 0f -> {
+                moveYaw += if (thePlayer.moveForward > 0) 0 else 180
             }
 
-            mc.thePlayer.moveForward != 0f && mc.thePlayer.moveStrafing != 0f -> {
-                if (mc.thePlayer.moveForward > 0) moveYaw += if (mc.thePlayer.moveStrafing > 0) -45 else 45 else moveYaw -= if (mc.thePlayer.moveStrafing > 0) -45 else 45
-                moveYaw += if (mc.thePlayer.moveForward > 0) 0 else 180
+            thePlayer.moveForward != 0f && thePlayer.moveStrafing != 0f -> {
+                if (thePlayer.moveForward > 0) moveYaw += if (thePlayer.moveStrafing > 0) -45 else 45 else moveYaw -= if (thePlayer.moveStrafing > 0) -45 else 45
+                moveYaw += if (thePlayer.moveForward > 0) 0 else 180
             }
 
-            mc.thePlayer.moveStrafing != 0f && mc.thePlayer.moveForward == 0f -> {
-                moveYaw += if (mc.thePlayer.moveStrafing > 0) -90 else 90
+            thePlayer.moveStrafing != 0f && thePlayer.moveForward == 0f -> {
+                moveYaw += if (thePlayer.moveStrafing > 0) -90 else 90
             }
         }
         return Math.floorMod(moveYaw.toInt(), 360).toDouble()
@@ -534,39 +537,30 @@ object Velocity : Module("Velocity", Category.COMBAT) {
                 pauseTicks = ticksToPause
             }
 
+            // Global Velocity Angle Check
+            if (onlyWhenFacing) {
+                var packetDirection = 0.0
+                when (packet) {
+                    is S12PacketEntityVelocity -> packetDirection = atan2(packet.motionX.toDouble(), packet.motionZ.toDouble())
+                    is S27PacketExplosion -> packetDirection = atan2(thePlayer.motionX + packet.field_149152_f, thePlayer.motionZ + packet.field_149159_h)
+                }
+                
+                val degreePlayer = getMovementDirection()
+                val degreePacket = Math.floorMod(packetDirection.toDegrees().toInt(), 360).toDouble()
+                var angle = abs(degreePacket + degreePlayer)
+                angle = Math.floorMod(angle.toInt(), 360).toDouble()
+
+                val inRange = angle in 180 - (maxAngleDifference / 2.0)..180 + (maxAngleDifference / 2.0)
+                if (!inRange) return@handler // Don't modify velocity if not facing the source
+            }
+
             when (mode.lowercase()) {
                 "simple" -> handleVelocity(event)
 
                 "aac", "reverse", "smoothreverse", "aaczero", "ghostblock", "intavereduce" -> hasReceivedVelocity = true
 
                 "jump" -> {
-                    // TODO: Recode and make all velocity modes support velocity direction checks
-                    var packetDirection = 0.0
-                    when (packet) {
-                        is S12PacketEntityVelocity -> {
-                            if (packet.entityID != thePlayer.entityId) return@handler
-
-                            val motionX = packet.motionX.toDouble()
-                            val motionZ = packet.motionZ.toDouble()
-
-                            packetDirection = atan2(motionX, motionZ)
-                        }
-
-                        is S27PacketExplosion -> {
-                            val motionX = thePlayer.motionX + packet.field_149152_f
-                            val motionZ = thePlayer.motionZ + packet.field_149159_h
-
-                            packetDirection = atan2(motionX, motionZ)
-                        }
-                    }
-                    val degreePlayer = getDirection()
-                    val degreePacket = Math.floorMod(packetDirection.toDegrees().toInt(), 360).toDouble()
-                    var angle = abs(degreePacket + degreePlayer)
-                    val threshold = 120.0
-                    angle = Math.floorMod(angle.toInt(), 360).toDouble()
-                    val inRange = angle in 180 - threshold / 2..180 + threshold / 2
-                    if (inRange)
-                        hasReceivedVelocity = true
+                    hasReceivedVelocity = true
                 }
                 "keepy" -> {
                     if (packet is S12PacketEntityVelocity && packet.entityID == thePlayer.entityId) {

@@ -94,10 +94,7 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
     private val clickOnly by boolean("ClickOnly", false)
 
     // Range
-    // TODO: Make block range independent from attack range
-    private val range: Float by float("Range", 3.7f, 1f..8f).onChanged {
-        blockRange = blockRange.coerceAtMost(it)
-    }
+    private val range: Float by float("Range", 3.7f, 1f..8f)
     private val scanRange by float("ScanRange", 2f, 0f..10f)
     private val throughWallsRange by float("ThroughWallsRange", 3f, 0f..8f)
     private val rangeSprintReduction by float("RangeSprintReduction", 0f, 0f..0.4f)
@@ -181,11 +178,8 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
     // Don't block if target isn't holding a sword or an axe
     private val checkWeapon by boolean("CheckEnemyWeapon", true) { smartAutoBlock }
 
-    // TODO: Make block range independent from attack range
-    private var blockRange: Float by float("BlockRange", range, 1f..8f) {
+    private var blockRange: Float by float("BlockRange", 3.7f, 1f..8f) {
         smartAutoBlock
-    }.onChange { _, new ->
-        new.coerceAtMost(this@KillAura.range)
     }
 
     // Don't block when you can't get damaged

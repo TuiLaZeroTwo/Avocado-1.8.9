@@ -6,7 +6,6 @@ uniform float speed;
 uniform int maxColors;
 uniform vec4 colors[9];
 
-// TODO: Fix Random Stutter
 void main() {
     vec2 pos = gl_FragCoord.xy * strength;
     float param = mod(pos.x + pos.y + offset * speed, 1.0);
@@ -22,7 +21,7 @@ void main() {
     idx1 = mod(idx1, float(maxColors));
     idx2 = mod(idx2, float(maxColors));
 
-    vec4 gradientColor = mix(colors[int(idx1)], colors[int(idx2)], smoothstep(0.0, 1.0, frac));
+    vec4 gradientColor = mix(colors[int(idx1)], colors[int(idx2)], frac);
 
     gl_FragColor = gradientColor;
 }

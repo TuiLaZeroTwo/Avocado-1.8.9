@@ -90,13 +90,6 @@ object InventoryManager : Configurable("InventoryManager"), MinecraftInstance, L
 
         // Following actions require inventory / simulated inventory, ...
 
-        // TODO: This could be at start of each action?
-        // Don't wait for NoMove not to be violated, check if there is anything to equip from hotbar and such by looping again
-        if (!canClickInventory() || (invOpenValue.get() && mc.currentScreen !is GuiInventory)) {
-            delay(50)
-            return@loopSequence
-        }
-
         canCloseInventory = false
 
         AutoArmor.equipFromInventory()

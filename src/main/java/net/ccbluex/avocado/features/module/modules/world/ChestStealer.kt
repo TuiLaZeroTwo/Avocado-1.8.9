@@ -60,6 +60,9 @@ object ChestStealer : Module("ChestStealer", Category.WORLD) {
     private val startDelay by intRange("StartDelay", 50..100, 0..500)
     private val closeDelay by intRange("CloseDelay", 50..100, 0..500)
 
+    private val delayOnEquip by boolean("DelayOnEquip", true)
+    private val armorEquipDelay by intRange("ArmorEquipDelay", 100..150, 0..1000) { delayOnEquip }
+
     private val noMove by +InventoryManager.noMoveValue
     private val noMoveAir by +InventoryManager.noMoveAirValue
     private val noMoveGround by +InventoryManager.noMoveGroundValue
@@ -196,7 +199,6 @@ object ChestStealer : Module("ChestStealer", Category.WORLD) {
                         if (item !is ItemArmor || thePlayer.inventory.armorInventory[getArmorPosition(stack) - 1] != null)
                             return@clickNextTick
 
-                        // TODO: should the stealing be suspended until the armor gets equipped and some delay on top of that, maybe toggleable?
                         // Try to equip armor piece from hotbar 1 tick after stealing it
                         nextTick {
                             val hotbarStacks = thePlayer.inventory.mainInventory.take(9)
@@ -210,6 +212,11 @@ object ChestStealer : Module("ChestStealer", Category.WORLD) {
                     }
 
                     delay(stealingDelay.toLong())
+
+                    // Suspend stealing until the armor gets equipped, adding a toggleable delay
+                    if (delayOnEquip && AutoArmor.canEquipFromChest() && stack.item is ItemArmor && thePlayer.inventory.armorInventory[getArmorPosition(stack) - 1] == null) {
+                        delay(armorEquipDelay.random().toLong())
+                    }
 
                     if (simulateShortStop && Math.random() > 0.75) {
                         val minDelays = randomDelay(150, 300)

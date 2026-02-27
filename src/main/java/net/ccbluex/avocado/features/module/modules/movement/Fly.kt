@@ -296,28 +296,27 @@ object Fly : Module("Fly", Category.MOVEMENT, Keyboard.KEY_F) {
         groundTimer.reset()
     }
 
-    // TODO: Make better and faster calculation lol
     private fun calculateGround(): Double {
         val playerBoundingBox = mc.thePlayer.entityBoundingBox
-        var blockHeight = 0.05
-        var ground = mc.thePlayer.posY
-        while (ground > 0.0) {
-            val customBox = AxisAlignedBB.fromBounds(
-                playerBoundingBox.maxX,
-                ground + blockHeight,
-                playerBoundingBox.maxZ,
-                playerBoundingBox.minX,
-                ground,
-                playerBoundingBox.minZ
-            )
-            if (mc.theWorld.checkBlockCollision(customBox)) {
-                if (blockHeight <= 0.05) return ground + blockHeight
-                ground += blockHeight
-                blockHeight = 0.05
+        val box = AxisAlignedBB(
+            playerBoundingBox.minX,
+            0.0,
+            playerBoundingBox.minZ,
+            playerBoundingBox.maxX,
+            playerBoundingBox.minY,
+            playerBoundingBox.maxZ
+        )
+        
+        val collisions = mc.theWorld.getCollidingBoundingBoxes(mc.thePlayer, box)
+        
+        var groundY = 0.0
+        for (aabb in collisions) {
+            if (aabb != null && aabb.maxY > groundY) {
+                groundY = aabb.maxY
             }
-            ground -= blockHeight
         }
-        return 0.0
+        
+        return groundY
     }
 
     override val tag
