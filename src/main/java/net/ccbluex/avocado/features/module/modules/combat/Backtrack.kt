@@ -44,7 +44,9 @@ import java.util.concurrent.ConcurrentLinkedQueue
 object Backtrack : Module("Backtrack", Category.COMBAT) {
 
     private val nextBacktrackDelay by int("NextBacktrackDelay", 0, 0..2000) { mode == "Modern" }
-    private val maxDelay: Value<Int> = int("MaxDelay", 80, 0..2000) { mode != "Intave" }.onChange { _, new ->
+    private val maxDelay: Value<Int> = int("MaxDelay", 80, 0..2000) {
+        mode == "Legacy" || mode == "Modern"
+    }.onChange { _, new ->
         new.coerceAtLeast(minDelay.get())
     }
     private val minDelay: Value<Int> = int("MinDelay", 80, 0..2000) {
@@ -53,9 +55,10 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
         new.coerceAtMost(maxDelay.get())
     }
 
-    val mode by choices("Mode", arrayOf("Legacy", "Modern", "Intave"), "Modern").onChanged {
+    val mode by choices("Mode", arrayOf("Legacy", "Modern", "Intave", "Zone"), "Modern").onChanged {
         clearPackets()
         clearIntavePackets()
+        clearZonePackets()
         backtrackedPlayer.clear()
     }
 
@@ -74,6 +77,26 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
     private val intaveMinDelay by int("Intave-MinDelay", 80, 20..300) { mode == "Intave" }
     private val intaveMaxDist by float("Intave-MaxDist", 6f, 3f..8f) { mode == "Intave" }
     private val intaveSmart by boolean("Intave-Smart", true) { mode == "Intave" }
+
+    // Zone
+    private val zoneMinDelay by int("ZoneMinDelay", 100, 0..1000) { mode == "Zone" }
+    private val zoneMaxDelay by int("ZoneMaxDelay", 200, 0..1000) { mode == "Zone" }
+    private val zoneRange by float("ZoneRange", 3.0f, 0f..10f) { mode == "Zone" }
+    private val zoneESP by boolean("ZoneESP", true) { mode == "Zone" }
+
+    // Zone Backtrack
+    private val zonePackets = Collections.synchronizedList(mutableListOf<Packet<*>>())
+    private val zoneSkipPackets = mutableListOf<Packet<*>>()
+
+    private var zoneTarget: EntityLivingBase? = null
+    private var zoneCanFlush = false
+    private var zoneDelay = 0L
+    private var zoneLastFlush = System.currentTimeMillis()
+
+    private var zoneRealX = 0.0
+    private var zoneRealY = 0.0
+    private var zoneRealZ = 0.0
+    private var zoneHasData = false
 
     // ESP
     private val espMode by choices(
@@ -109,6 +132,7 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
         get() = when (mode) {
             "Intave" -> intaveCurrentDelay.toInt()
             "Modern" -> modernDelay.first
+            "Zone" -> zoneDelay.toInt()
             else -> maxDelay.get()
         }
 
@@ -170,6 +194,53 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
                             )
                         }
                     }
+                }
+            }
+
+            "zone" -> {
+
+                if (event.eventType != EventState.RECEIVE) return@handler
+
+                val t = zoneTarget ?: return@handler
+                if (mc.theWorld == null) return@handler
+
+                if (zoneSkipPackets.remove(packet)) return@handler
+
+                when (packet) {
+                    is S06PacketUpdateHealth -> if (packet.health <= 0) zoneCanFlush = true               // Added from LiquidZone @author BPM
+                    is S08PacketPlayerPosLook,
+                    is S40PacketDisconnect,
+                    is S02PacketChat -> zoneCanFlush = true
+
+                    is S13PacketDestroyEntities -> {
+                        if (t.entityId in packet.entityIDs) zoneCanFlush = true
+                    }
+                }
+
+                if (packet is S14PacketEntity && packet.entityId == t.entityId) {
+                    zoneRealX += packet.func_149062_c()
+                    zoneRealY += packet.func_149061_d()
+                    zoneRealZ += packet.func_149064_e()
+                }
+
+                if (packet is S18PacketEntityTeleport && packet.entityId == t.entityId) {
+                    zoneRealX = packet.x.toDouble()
+                    zoneRealY = packet.y.toDouble()
+                    zoneRealZ = packet.z.toDouble()
+                    zoneHasData = true
+                }
+
+                if (zoneTarget == null || zoneCanFlush) {
+                    flushZonePackets()
+                    return@handler
+                }
+
+                val name = packet.javaClass.simpleName
+                if (!name.startsWith("S")) return@handler
+
+                synchronized(zonePackets) {
+                    zonePackets.add(packet)
+                    event.cancelEvent()
                 }
             }
 
@@ -283,6 +354,41 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
             }
         }
 
+        if (mode == "Zone" && mc.thePlayer != null && mc.theWorld != null) {
+
+            if (zoneTarget != null &&
+                mc.theWorld.getEntityByID(zoneTarget!!.entityId) == null) {
+
+                flushZonePackets()
+                zoneTarget = null
+                zoneHasData = false
+                return@handler
+            }
+
+            val t = zoneTarget ?: return@handler
+            if (!zoneHasData) return@handler
+
+            val worldX = zoneRealX / 32.0
+            val worldY = zoneRealY / 32.0
+            val worldZ = zoneRealZ / 32.0
+
+            val realDist = mc.thePlayer.getDistance(worldX, worldY, worldZ)
+            val renderDist = mc.thePlayer.getDistance(t.posX, t.posY, t.posZ)
+
+            if (zoneCanFlush) {
+                flushZonePackets()
+                zoneCanFlush = false
+                return@handler
+            }
+
+            if (renderDist >= realDist || realDist > zoneRange) {
+                flushZonePackets()
+            } else if (System.currentTimeMillis() - zoneLastFlush >= zoneDelay) {
+                flushZonePackets()
+                zoneDelay = randomDelay(zoneMinDelay, zoneMaxDelay).toLong()
+            }
+        }
+
         val target = target
         val targetMixin = target as? IMixinEntity
 
@@ -369,6 +475,22 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
             reset()
         }
 
+        if (mode == "Zone" && event.targetEntity is EntityLivingBase) {
+            val entity = event.targetEntity as EntityLivingBase
+
+            if (zoneTarget != entity) {
+                flushZonePackets()
+                zoneHasData = false
+                zoneRealX = entity.serverPosX.toDouble()
+                zoneRealY = entity.serverPosY.toDouble()
+                zoneRealZ = entity.serverPosZ.toDouble()
+                zoneHasData = true
+            }
+
+            zoneTarget = entity
+            zoneDelay = randomDelay(zoneMinDelay, zoneMaxDelay).toLong()
+        }
+
         if (event.targetEntity is EntityLivingBase) {
             target = event.targetEntity
             if (mode == "Intave") {
@@ -412,6 +534,31 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
                         glPopMatrix()
                     }
                 }
+            }
+
+            "zone" -> {
+
+                if (!zoneESP) return@handler
+
+                val t = zoneTarget ?: return@handler
+                if (!zoneHasData) return@handler
+
+                val realX = zoneRealX / 32.0
+                val realY = zoneRealY / 32.0
+                val realZ = zoneRealZ / 32.0
+
+                val renderX = realX - manager.renderPosX
+                val renderY = realY - manager.renderPosY
+                val renderZ = realZ - manager.renderPosZ
+
+                drawBacktrackBox(
+                    t.entityBoundingBox.offset(
+                        renderX - t.posX,
+                        renderY - t.posY,
+                        renderZ - t.posZ
+                    ),
+                    Color(72,125,227)
+                )
             }
 
             "modern", "intave" -> {
@@ -519,12 +666,40 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
         }
     }
 
-    override fun onEnable() = reset()
+    override fun onEnable() {
+        reset()
+        zoneLastFlush = System.currentTimeMillis()
+    }
 
     override fun onDisable() {
+        clearZonePackets()
         clearPackets()
         clearIntavePackets()
         backtrackedPlayer.clear()
+    }
+
+    private fun clearZonePackets() {
+        zonePackets.clear()
+        zoneSkipPackets.clear()
+        zoneTarget = null
+        zoneHasData = false
+        zoneRealX = 0.0
+        zoneRealY = 0.0
+        zoneRealZ = 0.0
+    }
+
+    private fun flushZonePackets() {
+        if (zonePackets.isEmpty()) return
+
+        synchronized(zonePackets) {
+            while (zonePackets.isNotEmpty()) {
+                val packet = zonePackets.removeAt(0)
+                zoneSkipPackets.add(packet)
+                PacketUtils.schedulePacketProcess(packet)
+            }
+        }
+
+        zoneLastFlush = System.currentTimeMillis()
     }
 
     private fun handlePackets() {
