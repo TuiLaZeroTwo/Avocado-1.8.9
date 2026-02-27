@@ -44,7 +44,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 object Backtrack : Module("Backtrack", Category.COMBAT) {
 
     private val nextBacktrackDelay by int("NextBacktrackDelay", 0, 0..2000) { mode == "Modern" }
-    private val maxDelay: Value<Int> = int("MaxDelay", 80, 0..2000).onChange { _, new ->
+    private val maxDelay: Value<Int> = int("MaxDelay", 80, 0..2000) { mode != "Intave" }.onChange { _, new ->
         new.coerceAtLeast(minDelay.get())
     }
     private val minDelay: Value<Int> = int("MinDelay", 80, 0..2000) {
@@ -53,8 +53,9 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
         new.coerceAtMost(maxDelay.get())
     }
 
-    val mode by choices("Mode", arrayOf("Legacy", "Modern"), "Modern").onChanged {
+    val mode by choices("Mode", arrayOf("Legacy", "Modern", "Intave"), "Modern").onChanged {
         clearPackets()
+        clearIntavePackets()
         backtrackedPlayer.clear()
     }
 
@@ -65,19 +66,25 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
 
     // Modern
     private val style by choices("Style", arrayOf("Pulse", "Smooth"), "Smooth") { mode == "Modern" }
-    private val distance by floatRange("Distance", 2f..3f, 0f..6f) { mode == "Modern" }
+    private val distance by floatRange("Distance", 2f..3f, 0f..6f) { mode == "Modern" || mode == "Intave" }
     private val smart by boolean("Smart", true) { mode == "Modern" }
+
+    // Intave
+    private val intaveMaxDelay by int("Intave-MaxDelay", 120, 50..400) { mode == "Intave" }
+    private val intaveMinDelay by int("Intave-MinDelay", 80, 20..300) { mode == "Intave" }
+    private val intaveMaxDist by float("Intave-MaxDist", 6f, 3f..8f) { mode == "Intave" }
+    private val intaveSmart by boolean("Intave-Smart", true) { mode == "Intave" }
 
     // ESP
     private val espMode by choices(
         "ESP-Mode",
         arrayOf("None", "Box", "Model", "Wireframe"),
         "Box"
-    ) { mode == "Modern" }.subjective()
+    ) { mode == "Modern" || mode == "Intave" }.subjective()
     private val wireframeWidth by float("WireFrame-Width", 1f, 0.5f..5f) { espMode == "WireFrame" }
 
     private val espColor =
-        ColorSettingsInteger(this, "ESPColor") { espMode != "Model" && mode == "Modern" }.with(0, 255, 0)
+        ColorSettingsInteger(this, "ESPColor") { espMode != "Model" && (mode == "Modern" || mode == "Intave") }.with(0, 255, 0)
 
     private val packetQueue = ConcurrentLinkedQueue<QueueData>()
     private val positions = ConcurrentLinkedQueue<Pair<Vec3, Long>>()
@@ -93,9 +100,17 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
     private var delayForNextBacktrack = 0L
 
     private var modernDelay = randomDelay(minDelay.get(), maxDelay.get()) to false
+    
+    private val intavePacketQueue = ConcurrentLinkedQueue<QueueData>()
+    private val intavePositions = ConcurrentLinkedQueue<Pair<Vec3, Long>>()
+    private var intaveCurrentDelay = 0L
 
     private val supposedDelay
-        get() = if (mode == "Modern") modernDelay.first else maxDelay.get()
+        get() = when (mode) {
+            "Intave" -> intaveCurrentDelay.toInt()
+            "Modern" -> modernDelay.first
+            else -> maxDelay.get()
+        }
 
     // Legacy
     private val maximumCachedPositions by int("MaxCachedPositions", 10, 1..20) { mode == "Legacy" }
@@ -115,6 +130,11 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
 
         if (TickBase.duringTickModification && mode == "Modern") {
             clearPackets(stopRendering = false)
+            return@handler
+        }
+
+        if (TickBase.duringTickModification && mode == "Intave") {
+            clearIntavePackets(stopRendering = false)
             return@handler
         }
 
@@ -220,6 +240,35 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
                     packetQueue += QueueData(packet, System.currentTimeMillis())
                 }
             }
+
+            "intave" -> {
+                if (mc.isSingleplayer || mc.currentServerData == null) {
+                    clearIntavePackets()
+                    return@handler
+                }
+
+                if (event.eventType != EventState.RECEIVE) return@handler
+
+                if (!shouldBacktrack()) {
+                    if (intavePacketQueue.isNotEmpty()) clearIntavePackets()
+                    return@handler
+                }
+
+                val isTargetMovementPacket = when (packet) {
+                    is S14PacketEntity -> packet.entityId == target?.entityId
+                    is S18PacketEntityTeleport -> packet.entityId == target?.entityId
+                    else -> false
+                }
+
+                if (!isTargetMovementPacket) return@handler
+
+                (target as? IMixinEntity)?.run {
+                    intavePositions += Pair(Vec3(trueX, trueY, trueZ), System.currentTimeMillis())
+                }
+
+                event.cancelEvent()
+                intavePacketQueue += QueueData(packet, System.currentTimeMillis())
+            }
         }
     }
 
@@ -259,6 +308,40 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
             } else clear()
         }
 
+        if (mode == "Intave") {
+            if (shouldBacktrack() && targetMixin != null) {
+                if (!Blink.blinkingReceive() && targetMixin.truePos) {
+                    val trueDist = mc.thePlayer.getDistance(targetMixin.trueX, targetMixin.trueY, targetMixin.trueZ)
+                    val dist = mc.thePlayer.getDistance(target.posX, target.posY, target.posZ)
+
+                    if (trueDist > intaveMaxDist) {
+                        clearIntavePackets()
+                        return@handler
+                    }
+
+                    if (intaveSmart && trueDist < dist) {
+                        clearIntavePackets()
+                        return@handler
+                    }
+
+                    shouldRender = true
+
+                    val now = System.currentTimeMillis()
+                    intavePacketQueue.removeAll { (packet, timestamp) ->
+                        if (timestamp <= now - intaveCurrentDelay) {
+                            PacketUtils.schedulePacketProcess(packet)
+                            true
+                        } else false
+                    }
+                    intavePositions.removeAll { (_, timestamp) -> timestamp < now - intaveCurrentDelay }
+
+                    if (mc.thePlayer.getDistanceToEntityBox(target) in distance) {
+                        clearIntavePackets()
+                    }
+                } else clearIntavePackets()
+            } else clearIntavePackets()
+        }
+
         ignoreWholeTick = false
     }
 
@@ -281,14 +364,16 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
     val onAttack = handler<AttackEvent> { event ->
         if (!isSelected(event.targetEntity, true)) return@handler
 
-        // Clear all packets, start again on enemy change
         if (target != event.targetEntity) {
-            clearPackets()
+            if (mode == "Intave") clearIntavePackets() else clearPackets()
             reset()
         }
 
         if (event.targetEntity is EntityLivingBase) {
             target = event.targetEntity
+            if (mode == "Intave") {
+                intaveCurrentDelay = randomDelay(intaveMinDelay, intaveMaxDelay).toLong()
+            }
         }
     }
 
@@ -329,7 +414,7 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
                 }
             }
 
-            "modern" -> {
+            "modern", "intave" -> {
                 if (!shouldBacktrack() || !shouldRender) return@handler
 
                 target?.run {
@@ -428,6 +513,9 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
         if (mode == "Modern") {
             if (event.worldClient == null) clearPackets(false)
             target = null
+        } else if (mode == "Intave") {
+            if (event.worldClient == null) clearIntavePackets(false)
+            target = null
         }
     }
 
@@ -435,6 +523,7 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
 
     override fun onDisable() {
         clearPackets()
+        clearIntavePackets()
         backtrackedPlayer.clear()
     }
 
@@ -506,6 +595,19 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
         }
     }
 
+    private fun clearIntavePackets(handlePackets: Boolean = true, stopRendering: Boolean = true) {
+        intavePacketQueue.removeAll {
+            if (handlePackets) {
+                PacketUtils.schedulePacketProcess(it.packet)
+            }
+            true
+        }
+        intavePositions.clear()
+        if (stopRendering) {
+            shouldRender = false
+        }
+    }
+
     private fun addBacktrackData(id: UUID, x: Double, y: Double, z: Double, time: Long) {
         // Get backtrack data of player
         val backtrackData = getBacktrackData(id)
@@ -553,7 +655,7 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
      * This function will loop through the backtrack data of an entity.
      */
     fun loopThroughBacktrackData(entity: Entity, action: () -> Boolean) {
-        if (!state || entity !is EntityPlayer || mode == "Modern") return
+        if (!state || entity !is EntityPlayer || mode in arrayOf("Modern", "Intave")) return
 
         val backtrackDataArray = getBacktrackData(entity.uniqueID) ?: return
 
@@ -572,7 +674,7 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
     }
 
     fun <T> runWithNearestTrackedDistance(entity: Entity, f: () -> T): T {
-        if (entity !is EntityPlayer || !handleEvents() || mode == "Modern") {
+        if (entity !is EntityPlayer || !handleEvents() || mode in arrayOf("Modern", "Intave")) {
             return f()
         }
 
@@ -641,7 +743,7 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
         get() = espColor.color()
 
     private fun shouldBacktrack() =
-        mc.thePlayer != null && mc.theWorld != null && target != null && mc.thePlayer.health > 0 && (target!!.health > 0 || target!!.health.isNaN()) && mc.playerController.currentGameType != WorldSettings.GameType.SPECTATOR && System.currentTimeMillis() >= delayForNextBacktrack && target?.let {
+        mc.thePlayer != null && mc.theWorld != null && target != null && mc.thePlayer.health > 0 && (target!!.health > 0 || target!!.health.isNaN()) && mc.playerController.currentGameType != WorldSettings.GameType.SPECTATOR && (mode == "Intave" || System.currentTimeMillis() >= delayForNextBacktrack) && target?.let {
             isSelected(it, true) && (mc.thePlayer?.ticksExisted ?: 0) > 20 && !ignoreWholeTick
         } == true
 
