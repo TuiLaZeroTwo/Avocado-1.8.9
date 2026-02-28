@@ -1,75 +1,185 @@
-# 🥑 Avocado Client
+<h1 align="center">Avocado Client</h1>
 
-**Avocado Client** is a lightweight, performance-focused Minecraft hacked client designed for smooth gameplay and competitive advantages.
+<p align="center">
+  <strong>Performance-focused Minecraft Forge 1.8.9 Client</strong><br>
+  Forked from LiquidBounce b100 and redesigned for optimization, stability, and bypass reliability.
+</p>
 
-Built with stability and efficiency in mind, Avocado delivers powerful modules while keeping resource usage minimal.
+<p align="center">
+  <img src="https://img.shields.io/badge/Minecraft-1.8.9-green?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Forge-Supported-orange?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Mixin-Based-blue?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Optimized-Yes-brightgreen?style=for-the-badge">
+  <img src="https://img.shields.io/badge/License-GPLv3-red?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Made%20in-Vietnam-red?style=for-the-badge">
+</p>
 
 ---
 
-## ✨ Features
+## Overview
 
-- ⚡ Lightweight & optimized performance
-- 🎯 Advanced combat modules
-- 🧩 Modular & customizable system
-- 🖥️ Clean HUD & smooth rendering
-- 🔧 Easy configuration & keybind control
-- 🚀 Designed for stability and responsiveness
+**Avocado Client** is a mixin-based injection hacked client developed for **Minecraft Forge 1.8.9**.
+
+This project is a fork of **LiquidBounce b100**, rebuilt with a focus on:
+
+- performance optimization
+- improved combat timing
+- enhanced anti-cheat bypass systems
+- cleaner and more maintainable architecture
+- rendering and event pipeline improvements
+
+Avocado is developed and maintained by Vietnamese developers, aiming to deliver a stable, optimized, and competitive client tailored for the Minecraft 1.8.9 environment.
 
 ---
 
-## 🚀 Getting Started
+## Official Links
 
-### 🔧 Setting up a Workspace
+Website: NONE  
+YouTube: https://www.youtube.com/@beophiman  
+Discord: https://discord.gg/NnZabqafzh
 
-Depending on which IDE you are using, run one of the following commands:
+---
 
-#### IntelliJ IDEA
-```bash
-gradlew setupDevWorkspace idea genIntellijRuns build
+## Core Improvements Over LiquidBounce b100
+
+- Reduced CPU overhead and improved tick handling
+- Optimized event system execution
+- Enhanced velocity and reach handling modes
+- Improved bypass logic for modern anti-cheats
+- Cleaner module architecture
+- Refactored rendering pipeline
+- Increased runtime stability
+
+---
+
+## Feature Highlights
+
+### Performance
+
+- Lightweight execution
+- Optimized module updates
+- Reduced frame drops
+- Efficient packet handling
+
+### Combat System
+
+- Advanced bypass techniques
+- Multiple velocity modes
+- Configurable reach handling
+- Improved hit registration logic
+
+### Rendering & HUD
+
+- Clean rendering structure
+- Stable 2D and 3D rendering
+- Customizable module display
+
+### Architecture
+
+- Modular system design
+- Easier debugging and development
+- Structured codebase for scalability
+
+---
+
+## Technical Details
+
+Avocado uses **Sponge Mixins** to inject custom logic into Minecraft at runtime.  
+This allows modification of behavior without redistributing Mojang’s proprietary source code.
+
+More information about Mixins:  
+https://docs.spongepowered.org/5.1.0/en/plugin/internals/mixins.html
+
+---
+
+## Setting Up a Development Workspace
+
+Avocado uses **Gradle**. Make sure Gradle is properly installed.
+
+### 1. Clone the repository
+
+```
+git clone https://github.com/AvocadoMC/Avocado-1.8.9.git
 ```
 
-#### Eclipse
-```bash
-gradlew setupDevWorkspace eclipse build
+### 2. Enter project directory
+
+```
+cd Avocado-1.8.9
 ```
 
-After setup completes:
+### 3. Generate IDE workspace
 
-1. Open the project in your IDE
-2. Refresh Gradle
-3. Run the Minecraft configuration
+**For IntelliJ**
 
----
+```
+gradlew --debug setupDevWorkspace idea genIntellijRuns build
+```
 
-## 📦 Requirements
+**For Eclipse**
 
-- Java 8
-- Minecraft Forge environment
-- Gradle (wrapper included)
+```
+gradlew --debug setupDevWorkspace eclipse build
+```
 
----
-
-## ⚠️ Disclaimer
-
-This project is provided for **educational and development purposes**.
-
-Using modified clients may violate server rules.  
-Use at your own risk.
+### 4. Open the folder as a Gradle project
+### 5. Launch using Forge or Vanilla run configuration
 
 ---
 
-## ❤️ Contributing
+## License
 
-Contributions, improvements, and suggestions are welcome.  
-Feel free to fork the project and submit a pull request.
+This project is licensed under the **GNU General Public License v3.0**.
+
+The license applies only to the clean source code in this repository.  
+External source code used during development or compilation may not be covered.
+
+### You are allowed to:
+
+- Use the project
+- Modify the project
+- Share the project
+- Use it commercially
+
+### Requirements:
+
+- You must disclose your modified source code
+- You must disclose any code taken from this project
+- You may not use this code in closed-source or obfuscated software
+- Your modified version must also be licensed under GPL v3
+
+If you redistribute Avocado Client, it must remain open-source.
 
 ---
-## ⭐ Support
 
-If you like this project, consider giving it a ⭐ on GitHub!
+## Contributing
+
+Contributions are welcome.
+
+Current development goals:
+
+1. Performance optimization
+2. Rendering system refactor
+3. Combat logic improvements
+4. Bypass stability enhancements
+5. Codebase cleanup and modularization
+
+Developers experienced with Minecraft internals, networking, rendering, or anti-cheat analysis are encouraged to contribute.
 
 ---
 
-## 👤 Credits
+## Credits
 
-CCbluex , BeoPhiMan
+Avocado Client is based on the foundation of **LiquidBounce b100**.
+
+### Main Development & Direction
+- BeoPhiMan
+- TLZ
+
+Special thanks to the original LiquidBounce developers for the base architecture and mixin framework.
+
+---
+
+<p align="center">
+Developed in Vietnam • Built for performance • Designed for competitive environments
+</p>
