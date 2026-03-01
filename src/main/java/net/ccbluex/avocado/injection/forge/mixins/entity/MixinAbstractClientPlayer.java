@@ -1,12 +1,10 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.injection.forge.mixins.entity;
 
-import net.ccbluex.avocado.cape.CapeAPI;
-import net.ccbluex.avocado.cape.CapeInfo;
 import net.ccbluex.avocado.features.module.modules.misc.NameProtect;
 import net.ccbluex.avocado.features.module.modules.render.NoFOV;
 import net.minecraft.client.entity.AbstractClientPlayer;
@@ -27,22 +25,6 @@ import static net.ccbluex.avocado.utils.client.MinecraftInstance.mc;
 @Mixin(AbstractClientPlayer.class)
 @SideOnly(Side.CLIENT)
 public abstract class MixinAbstractClientPlayer extends MixinEntityPlayer {
-
-    private CapeInfo capeInfo;
-
-    @Inject(method = "getLocationCape", at = @At("HEAD"), cancellable = true)
-    private void getCape(CallbackInfoReturnable<ResourceLocation> callbackInfoReturnable) {
-        if (capeInfo == null) {
-            CapeAPI.INSTANCE.loadCape(getUniqueID(), newCapeInfo -> {
-                capeInfo = newCapeInfo;
-                return null;
-            });
-        }
-
-        if (capeInfo != null && capeInfo.isCapeAvailable()) {
-            callbackInfoReturnable.setReturnValue(capeInfo.getResourceLocation());
-        }
-    }
 
     @Inject(method = "getFovModifier", at = @At("HEAD"), cancellable = true)
     private void getFovModifier(CallbackInfoReturnable<Float> callbackInfoReturnable) {

@@ -1,7 +1,7 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.injection.forge.mixins.client;
 
@@ -92,7 +92,7 @@ public abstract class MixinMinecraft {
     public abstract void displayGuiScreen(GuiScreen guiScreenIn);
 
     @Unique
-    private Future<?> liquidBounce$preloadFuture;
+    private Future<?> avocado$preloadFuture;
 
     @Inject(method = "run", at = @At("HEAD"))
     private void init(CallbackInfo callbackInfo) {
@@ -100,7 +100,7 @@ public abstract class MixinMinecraft {
 
         if (displayHeight < 622) displayHeight = 622;
 
-        liquidBounce$preloadFuture = Avocado.INSTANCE.preload();
+        avocado$preloadFuture = Avocado.INSTANCE.preload();
     }
 
     @Inject(method = "runGameLoop", at = @At(value = "INVOKE", target = "Lnet/minecraft/profiler/Profiler;startSection(Ljava/lang/String;)V", ordinal = 1))
@@ -110,7 +110,7 @@ public abstract class MixinMinecraft {
 
     @Inject(method = "startGame", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;checkGLError(Ljava/lang/String;)V", ordinal = 2, shift = At.Shift.AFTER))
     private void startGame(CallbackInfo callbackInfo) throws ExecutionException, InterruptedException {
-        liquidBounce$preloadFuture.get();
+        avocado$preloadFuture.get();
 
         Avocado.INSTANCE.startClient();
     }

@@ -1,7 +1,7 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.ui.client.hud.element.elements
 
@@ -26,7 +26,7 @@ class Effects(
     side: Side = Side(Side.Horizontal.RIGHT, Side.Vertical.DOWN)
 ) : Element("Effects", x, y, scale, side) {
 
-    private val font by font("Font", Fonts.fontSemibold35)
+    private val font by font("Font", Fonts.mc.fontRendererObj)
     private val shadow by boolean("Shadow", true)
 
     /**

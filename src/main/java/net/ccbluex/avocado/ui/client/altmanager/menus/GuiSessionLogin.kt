@@ -1,11 +1,10 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.ui.client.altmanager.menus
 
-import com.thealtening.AltService
 import kotlinx.coroutines.launch
 import net.ccbluex.avocado.lang.translationButton
 import net.ccbluex.avocado.ui.client.altmanager.GuiAltManager
@@ -92,22 +91,14 @@ class GuiSessionLogin(private val prevGui: GuiAltManager) : AbstractScreen() {
                     val loginResult = LoginUtils.loginSessionId(sessionTokenField.text)
 
                     status = when (loginResult) {
-                        LoginUtils.LoginResult.LOGGED -> {
-                            if (GuiAltManager.altService.currentService != AltService.EnumAltService.MOJANG) {
-                                try {
-                                    GuiAltManager.altService.switchService(AltService.EnumAltService.MOJANG)
-                                } catch (e: NoSuchFieldException) {
-                                    LOGGER.error("Something went wrong while trying to switch alt service.", e)
-                                } catch (e: IllegalAccessException) {
-                                    LOGGER.error("Something went wrong while trying to switch alt service.", e)
-                                }
-                            }
-
+                        LoginUtils.LoginResult.LOGGED ->
                             "§aLogged into §f§l${mc.session.username}§a."
-                        }
 
-                        LoginUtils.LoginResult.FAILED_PARSE_TOKEN -> "§cFailed to parse Session ID!"
-                        LoginUtils.LoginResult.INVALID_ACCOUNT_DATA -> "§cInvalid Session ID!"
+                        LoginUtils.LoginResult.FAILED_PARSE_TOKEN ->
+                            "§cFailed to parse Session ID!"
+
+                        LoginUtils.LoginResult.INVALID_ACCOUNT_DATA ->
+                            "§cInvalid Session ID!"
                     }
 
                     loginButton.enabled = true

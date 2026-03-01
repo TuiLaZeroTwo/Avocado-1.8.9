@@ -1,13 +1,13 @@
 [
   {
-    "modid": "liquidbounce",
-    "name": "LiquidBounce",
+    "modid": "avocado",
+    "name": "Avocado",
     "description": "A free mixin-based injection hacked-client",
     "version": "${version}",
     "mcversion": "1.8.9",
-    "url": "https://liquidbounce.net",
+    "url": "https://github.com/AvocadoMC/Avocado-1.8.9",
     "updateUrl": "",
-    "authorList": ["CCBlueX"],
+    "authorList": ["CCBlueX, 1zun4, BPM, TLZ"],
     "credits": "",
     "logoFile": "",
     "screenshots": [],

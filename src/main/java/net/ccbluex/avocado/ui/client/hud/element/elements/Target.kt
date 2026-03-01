@@ -1,7 +1,7 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.ui.client.hud.element.elements
 
@@ -48,8 +48,8 @@ class Target : Element("Target") {
     private val backgroundMode by choices("Background-ColorMode", arrayOf("Custom", "Rainbow"), "Custom")
     private val backgroundColor by color("Background-Color", Color.BLACK.withAlpha(150)) { backgroundMode == "Custom" }
 
-    private val healthBarColor1 by color("HealthBar-Gradient1", Color(3, 65, 252))
-    private val healthBarColor2 by color("HealthBar-Gradient2", Color(3, 252, 236))
+    private val healthBarColor1 by color("HealthBar-Gradient1", Color(255, 0, 0))
+    private val healthBarColor2 by color("HealthBar-Gradient2", Color(0, 170, 255))
 
     private val roundHealthBarShape by boolean("RoundHealthBarShape", true)
 
@@ -60,8 +60,8 @@ class Target : Element("Target") {
     private val rainbowX by float("Rainbow-X", -1000F, -2000F..2000F) { backgroundMode == "Rainbow" }
     private val rainbowY by float("Rainbow-Y", -1000F, -2000F..2000F) { backgroundMode == "Rainbow" }
 
-    private val titleFont by font("TitleFont", Fonts.fontSemibold40)
-    private val healthFont by font("HealthFont", Fonts.fontRegular30)
+    private val titleFont by font("TitleFont", Fonts.mc.fontRendererObj)
+    private val healthFont by font("HealthFont", Fonts.mc.fontRendererObj)
     private val textShadow by boolean("TextShadow", false)
 
     private val fadeSpeed by float("FadeSpeed", 2F, 1F..9F)

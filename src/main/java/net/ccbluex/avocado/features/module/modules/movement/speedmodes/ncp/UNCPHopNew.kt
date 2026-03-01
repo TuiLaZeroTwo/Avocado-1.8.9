@@ -1,7 +1,7 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.features.module.modules.movement.speedmodes.ncp
 
@@ -18,7 +18,7 @@ import net.minecraft.potion.Potion
 * Working on UNCP/NCP & Verus b3896/b3901
 * Tested on: eu.loyisa.cn, anticheat-test.com
 * Credit: @larryngton
-* https://github.com/CCBlueX/LiquidBounce/pull/3798/files
+* https://github.com/AvocadoMC/Avocado-1.8.9/pull/3798/files
 */
 object UNCPHopNew : SpeedMode("UNCPHopNew") {
 

@@ -1,7 +1,7 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.ui.client.hud.element.elements
 
@@ -21,21 +21,21 @@ import kotlin.math.nextDown
 
 @ElementInfo(name = "Keystrokes")
 class Keystrokes : Element("Keystrokes", 2.0, 34.0) {
-    private val radius by float("RectangleRound-Radius", 3F, 0F..10F)
+    private val radius by float("RectangleRound-Radius", 0F, 0F..10F)
     private val textColors = ColorSettingsInteger(this, "Text", applyMax = true)
     private val rectColors = ColorSettingsInteger(this, "Rectangle").with(a = 150)
-    private val pressColors = ColorSettingsInteger(this, "Press").with(Color.BLUE)
+    private val pressColors = ColorSettingsInteger(this, "Press").with(Color.WHITE)
     private val renderBorder by boolean("RenderBorder", false)
-    private val borderColors = ColorSettingsInteger(this, "Border") { renderBorder }.with(Color.BLUE)
+    private val borderColors = ColorSettingsInteger(this, "Border") { renderBorder }.with(Color.WHITE)
     private val borderWidth by float("BorderWidth", 1.5F, 0.5F..5F) { renderBorder }
     private val onPressAnimation by choices(
-        "OnPressAnimationMode", arrayOf("None", "Shrink", "Fill", "ReverseFill"), "Fill"
+        "OnPressAnimationMode", arrayOf("None", "Shrink", "Fill", "ReverseFill"), "None"
     )
     private val shrinkPercentage by int("ShrinkPercentage", 90, 50..100, suffix = "%") { onPressAnimation == "Shrink" }
     private val shrinkSpeed by int("ShrinkSpeed", 2, 0..5, suffix = "Ticks") { onPressAnimation == "Shrink" }
 
     private var shadow by boolean("Text-Shadow", true)
-    private val font by font("Font", Fonts.fontSemibold35)
+    private val font by font("Font", Fonts.mc.fontRendererObj)
 
     private val textColor
         get() = textColors.color()

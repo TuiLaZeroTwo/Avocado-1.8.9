@@ -1,11 +1,10 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.ui.client.altmanager
 
-import com.thealtening.AltService
 import kotlinx.coroutines.launch
 import me.liuli.elixir.account.CrackedAccount
 import me.liuli.elixir.account.MicrosoftAccount
@@ -19,10 +18,8 @@ import net.ccbluex.avocado.file.FileManager.saveConfig
 import net.ccbluex.avocado.lang.translationButton
 import net.ccbluex.avocado.lang.translationMenu
 import net.ccbluex.avocado.lang.translationText
-import net.ccbluex.avocado.ui.client.altmanager.menus.GuiDonatorCape
 import net.ccbluex.avocado.ui.client.altmanager.menus.GuiLoginIntoAccount
 import net.ccbluex.avocado.ui.client.altmanager.menus.GuiSessionLogin
-import net.ccbluex.avocado.ui.client.altmanager.menus.altgenerator.GuiTheAltening
 import net.ccbluex.avocado.ui.font.AWTFontRenderer.Companion.assumeNonVolatile
 import net.ccbluex.avocado.ui.font.Fonts
 import net.ccbluex.avocado.utils.client.ClientUtils.LOGGER
@@ -86,12 +83,6 @@ class GuiAltManager(private val prevGui: GuiScreen) : AbstractScreen() {
         randomNameButton = +GuiButton(5, 5, startPositionY + 24 * 3, 90, 20, translationButton("altManager.randomName"))
         +GuiButton(6, 5, startPositionY + 24 * 4, 90, 20, translationButton("altManager.directLogin"))
         +GuiButton(10, 5, startPositionY + 24 * 5, 90, 20, translationButton("altManager.sessionLogin"))
-
-        if (activeGenerators.getOrDefault("thealtening", true)) {
-            +GuiButton(9, 5, startPositionY + 24 * 6, 90, 20, translationButton("altManager.theAltening"))
-        }
-
-        +GuiButton(11, 5, startPositionY + 24 * 7, 90, 20, translationButton("altManager.cape"))
     }
 
     override fun drawScreen(mouseX: Int, mouseY: Int, partialTicks: Float) {
@@ -111,11 +102,11 @@ class GuiAltManager(private val prevGui: GuiScreen) : AbstractScreen() {
             )
             Fonts.fontSemibold35.drawStringWithShadow(
                 "§7Type: §a${
-                    if (altService.currentService == AltService.EnumAltService.THEALTENING) "TheAltening" else if (isValidTokenOffline(
-                            mc.getSession().token
-                        )
-                    ) "Premium" else "Cracked"
-                }", 6f, 15f, 0xffffff
+                    if (isValidTokenOffline(mc.session.token)) "Premium" else "Cracked"
+                }",
+                6f,
+                15f,
+                0xffffff
             )
             searchField.drawTextBox()
             if (searchField.text.isEmpty() && !searchField.isFocused) Fonts.fontSemibold40.drawStringWithShadow(
@@ -183,9 +174,10 @@ class GuiAltManager(private val prevGui: GuiScreen) : AbstractScreen() {
                 } ?: "§cYou do not have any accounts."
             }
 
-            5 -> { // Random name button
-                status = "§aLogged into §f§l${randomAccount().name}§a."
-                altService.switchService(AltService.EnumAltService.MOJANG)
+            5 -> {
+                val name = randomAccount().name
+                mc.session = Session(name, "", "", "legacy")
+                status = "§aLogged into §f§l$name"
             }
 
             6 -> { // Direct login button
@@ -265,16 +257,8 @@ class GuiAltManager(private val prevGui: GuiScreen) : AbstractScreen() {
                 }
             }
 
-            9 -> { // Altening Button
-                mc.displayGuiScreen(GuiTheAltening(this))
-            }
-
             10 -> { // Session Login Button
                 mc.displayGuiScreen(GuiSessionLogin(this))
-            }
-
-            11 -> { // Donator Cape Button
-                mc.displayGuiScreen(GuiDonatorCape(this))
             }
 
             13 -> { // Move Up Button
@@ -460,48 +444,33 @@ class GuiAltManager(private val prevGui: GuiScreen) : AbstractScreen() {
 
     companion object {
 
-        val altService = AltService()
-        private val activeGenerators = mutableMapOf<String, Boolean>()
-
         fun loadActiveGenerators() {
-            try {
-                // Read versions json from cloud
-                activeGenerators += HttpClient.get("$CLIENT_CLOUD/generators.json").jsonBody<Map<String, Boolean>>()!!
-            } catch (throwable: Throwable) {
-                // Print throwable to console
-                LOGGER.error("Failed to load enabled generators.", throwable)
-            }
+        // Generators removed
         }
 
         fun login(
-            minecraftAccount: MinecraftAccount, success: () -> Unit, error: (Exception) -> Unit, done: () -> Unit
+            minecraftAccount: MinecraftAccount,
+            success: () -> Unit,
+            error: (Exception) -> Unit,
+            done: () -> Unit
         ) = SharedScopes.IO.launch {
-            if (altService.currentService != AltService.EnumAltService.MOJANG) {
-                try {
-                    altService.switchService(AltService.EnumAltService.MOJANG)
-                } catch (e: NoSuchFieldException) {
-                    error(e)
-                    LOGGER.error("Something went wrong while trying to switch alt service.", e)
-                } catch (e: IllegalAccessException) {
-                    error(e)
-                    LOGGER.error("Something went wrong while trying to switch alt service.", e)
-                }
-            }
-
             try {
                 minecraftAccount.update()
+
                 mc.session = Session(
                     minecraftAccount.session.username,
                     minecraftAccount.session.uuid,
                     minecraftAccount.session.token,
                     "microsoft"
                 )
-                call(SessionUpdateEvent)
 
+                call(SessionUpdateEvent)
                 success()
+
             } catch (exception: Exception) {
                 error(exception)
             }
+
             done()
         }
     }

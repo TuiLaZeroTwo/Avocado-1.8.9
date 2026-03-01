@@ -1,7 +1,7 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.ui.client.hud.element.elements
 
@@ -32,7 +32,7 @@ import kotlin.math.abs
 @ElementInfo(name = "TabGUI")
 class TabGUI(x: Double = 16.0, y: Double = 43.0) : Element("TabGUI", x = x, y = y) {
 
-    private val rectColor = color("RectangleColor", Color(0, 148, 255, 140))
+    private val rectColor = color("RectangleColor", Color(0, 0, 0, 140))
 
     private val rectRainbow
         get() = rectColor.rainbow && rectColor.isSupported()
@@ -68,7 +68,7 @@ class TabGUI(x: Double = 16.0, y: Double = 43.0) : Element("TabGUI", x = x, y = 
     private val shadowColor by color("ShadowColor", Color.BLACK.withAlpha(128)) { iconShadows }
 
     private val arrows by boolean("Arrows", false)
-    private val font by font("Font", Fonts.fontSemibold35)
+    private val font by font("Font", Fonts.mc.fontRendererObj)
     private val textShadow by boolean("TextShadow", false)
     private val textFade by boolean("TextFade", true)
     private val textPositionY by float("TextPosition-Y", 2F, 0F..5F)
