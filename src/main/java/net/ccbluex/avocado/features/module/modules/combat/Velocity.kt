@@ -1,7 +1,7 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.features.module.modules.combat
 
@@ -692,7 +692,7 @@ object Velocity : Module("Velocity", Category.COMBAT) {
         if (mode != "GrimC03")
             return@handler
 
-        // Timer Abuse (https://github.com/CCBlueX/LiquidBounce/issues/2519)
+        // Timer Abuse (https://github.com/AvocadoMC/Avocado-1.8.9/issues/2519)
         if (timerTicks > 0 && mc.timer.timerSpeed <= 1) {
             val timerSpeed = 0.8f + (0.2f * (20 - timerTicks) / 20)
             mc.timer.timerSpeed = timerSpeed.coerceAtMost(1f)

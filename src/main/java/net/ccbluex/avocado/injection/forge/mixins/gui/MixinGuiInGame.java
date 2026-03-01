@@ -1,7 +1,7 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.injection.forge.mixins.gui;
 
@@ -173,7 +173,7 @@ public abstract class MixinGuiInGame extends Gui {
             }
         }
 
-        liquidBounce$injectRender2DEvent(delta);
+        avocado$injectRender2DEvent(delta);
     }
 
     @Inject(method = "renderPumpkinOverlay", at = @At("HEAD"), cancellable = true)
@@ -193,7 +193,7 @@ public abstract class MixinGuiInGame extends Gui {
     }
 
     @Unique
-    private void liquidBounce$injectRender2DEvent(float delta) {
+    private void avocado$injectRender2DEvent(float delta) {
         if (!ClassUtils.INSTANCE.hasClass("net.labymod.api.LabyModAPI")) {
             EventManager.INSTANCE.call(new Render2DEvent(delta));
         }

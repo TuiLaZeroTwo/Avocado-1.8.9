@@ -1,7 +1,7 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.injection.forge.mixins.gui;
 
@@ -103,7 +103,7 @@ public abstract class MixinGuiChat extends MixinGuiScreen {
 
     /**
      * Add this callback, to check if the User complete a Playername or a Liquidbounce command.
-     * To fix this bug: https://github.com/CCBlueX/LiquidBounce1.8-Issues/issues/3795
+     * To fix this bug: https://github.com/AvocadoMC/Avocado-1.8.91.8-Issues/issues/3795
      *
      * @author derech1e
      */

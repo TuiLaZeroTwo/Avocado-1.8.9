@@ -1,7 +1,7 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado.file.configs
 
@@ -15,7 +15,6 @@ import net.ccbluex.avocado.file.FileConfig
 import net.ccbluex.avocado.file.FileManager
 import net.ccbluex.avocado.file.FileManager.PRETTY_GSON
 import net.ccbluex.avocado.file.configs.models.ClientConfiguration
-import net.ccbluex.avocado.ui.client.altmanager.menus.altgenerator.GuiTheAltening.Companion.apiKey
 import net.ccbluex.avocado.utils.attack.EntityUtils.Targets
 import net.ccbluex.avocado.utils.io.readJson
 import java.io.*
@@ -43,11 +42,6 @@ class ValuesConfig(file: File) : FileConfig(file) {
 
                 key.equals(ClientFixes.name, true) -> {
                     ClientFixes.fromJson(value)
-                }
-
-                key.equals("thealtening", true) -> {
-                    val jsonValue = value as JsonObject
-                    if (jsonValue.has("API-Key")) apiKey = jsonValue["API-Key"].asString
                 }
 
                 key.equals("DonatorCape", true) -> {
@@ -89,14 +83,6 @@ class ValuesConfig(file: File) : FileConfig(file) {
 
         jsonObject.add(Targets.name, Targets.toJson())
         jsonObject.add(ClientFixes.name, ClientFixes.toJson())
-
-        val theAlteningObject = JsonObject()
-        theAlteningObject.addProperty("API-Key", apiKey)
-        jsonObject.add("thealtening", theAlteningObject)
-
-        val capeObject = JsonObject()
-        capeObject.addProperty("TransferCode", CapeService.knownToken)
-        jsonObject.add("DonatorCape", capeObject)
 
         jsonObject.add(ClientConfiguration.name, ClientConfiguration.toJson())
 

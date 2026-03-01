@@ -1,7 +1,7 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/CCBlueX/LiquidBounce/
+ * https://github.com/AvocadoMC/Avocado-1.8.9/
  */
 package net.ccbluex.avocado
 
@@ -66,10 +66,10 @@ object Avocado {
      * This has all the basic information.
      */
     const val CLIENT_NAME = "Avocado"
-    const val CLIENT_AUTHOR = "CCBlueX, BPM"
+    const val CLIENT_AUTHOR = "CCBlueX, BPM, TLZ"
     const val CLIENT_CLOUD = "https://cloud.liquidbounce.net/LiquidBounce"
     const val CLIENT_WEBSITE = "avocado.net"
-    const val CLIENT_GITHUB = "https://github.com/CCBlueX/LiquidBounce"
+    const val CLIENT_GITHUB = "https://github.com/AvocadoMC/Avocado-1.8.9"
 
     const val MINECRAFT_VERSION = "1.8.9"
 

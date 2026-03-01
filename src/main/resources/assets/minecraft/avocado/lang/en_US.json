@@ -27,7 +27,6 @@
         "button.altManager.randomAlt": "Random Alt",
         "button.altManager.randomName": "Random Name",
         "button.altManager.directLogin": "Direct Login",
-        "button.altManager.theAltening": "TheAltening",
         "button.altManager.cape": "Cape",
         "button.altManager.sessionLogin": "Session Login",
         "button.altManager.buy": "Buy",
@@ -246,8 +245,6 @@
         "module.keyPearl.description": "Allows you to throw an ender pearl from your hotbar using a certain key.",
 
         "module.kick.description": "Allows you to kick yourself from a server.",
-        
-        "module.liquidChat.description": "Allows you to chat with other LiquidBounce users.",
         
         "module.liquidWalk.description": "Allows you to walk on water.",
         
