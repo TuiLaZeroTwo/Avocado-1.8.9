@@ -3,6 +3,9 @@ name: build
 on:
   push:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,11 +32,25 @@ jobs:
       - name: Show build output
         run: ls -l build/libs
 
+      - name: Get short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
       - name: Rename jar
-        run: mv build/libs/*.jar build/libs/Avocado-build.jar
+        run: mv build/libs/*.jar build/libs/Avocado-${GITHUB_SHA::7}.jar
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Avocado
-          path: build/libs/Avocado-build.jar
+          name: Avocado-${{ env.SHORT_SHA }}
+          path: build/libs/Avocado-${{ env.SHORT_SHA }}.jar
+
+      - name: Publish nightly pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: "Nightly Build (${{ env.SHORT_SHA }})"
+          prerelease: true
+          body: |
+            Automated nightly build from commit ${{ github.sha }}
+            Branch: ${{ github.ref_name }}
+          files: build/libs/Avocado-${{ env.SHORT_SHA }}.jar
