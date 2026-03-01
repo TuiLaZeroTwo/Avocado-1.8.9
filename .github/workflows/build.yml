@@ -27,16 +27,15 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build project
-        run: ./gradlew setupCiWorkspace build
-
-      - name: Show build output
-        run: ls -l build/libs
-
-      - name: Get short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+        run: |
+          ./gradlew setupCiWorkspace build
+          ls -l build/libs
 
       - name: Rename jar
-        run: mv build/libs/*.jar build/libs/Avocado-${GITHUB_SHA::7}.jar
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
+          mv build/libs/*.jar build/libs/Avocado-${SHORT_SHA}.jar
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
