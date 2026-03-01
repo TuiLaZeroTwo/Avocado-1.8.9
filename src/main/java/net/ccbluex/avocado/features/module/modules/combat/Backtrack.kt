@@ -1,7 +1,7 @@
 /*
  * Avocado Hacked Client
  * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
- * https://github.com/AvocadoMC/Avocado-1.8.9/
+ * https://github.com/CCBlueX/LiquidBounce/
  */
 package net.ccbluex.avocado.features.module.modules.combat
 
@@ -81,6 +81,8 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
     }
     private val intaveMaxDist by float("Intave-MaxDist", 6f, 3f..8f) { mode == "Intave" }
     private val intaveSmart by boolean("Intave-Smart", true) { mode == "Intave" }
+    private val intaveMaxPackets by int("Intave-MaxPackets", 20, 5..50) { mode == "Intave" }
+    private val intaveDelayJitter by int("Intave-DelayJitter", 15, 0..50) { mode == "Intave" }
 
     // Zone
     private val zoneMinDelay by int("ZoneMinDelay", 100, 0..1000) { mode == "Zone" }
@@ -342,6 +344,11 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
                 }
 
                 event.cancelEvent()
+                if (intavePacketQueue.size >= intaveMaxPackets) {
+                    val oldest = intavePacketQueue.poll()
+                    if (oldest != null) PacketUtils.schedulePacketProcess(oldest.packet)
+                    intavePositions.poll()
+                }
                 intavePacketQueue += QueueData(packet, System.currentTimeMillis())
             }
         }
@@ -425,7 +432,7 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
                     val dist = mc.thePlayer.getDistance(target.posX, target.posY, target.posZ)
 
                     if (trueDist > intaveMaxDist) {
-                        clearIntavePackets()
+                        drainOneIntavePacket()
                         return@handler
                     }
 
@@ -435,6 +442,13 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
                     }
 
                     shouldRender = true
+
+                    if (intaveDelayJitter > 0) {
+                        val jitter = (randomDelay(0, intaveDelayJitter * 2) - intaveDelayJitter).toLong()
+                        intaveCurrentDelay = (intaveCurrentDelay + jitter).coerceIn(
+                            intaveMinDelay.get().toLong(), intaveMaxDelay.get().toLong()
+                        )
+                    }
 
                     val now = System.currentTimeMillis()
                     intavePacketQueue.removeAll { (packet, timestamp) ->
@@ -446,7 +460,7 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
                     intavePositions.removeAll { (_, timestamp) -> timestamp < now - intaveCurrentDelay }
 
                     if (mc.thePlayer.getDistanceToEntityBox(target) in distance) {
-                        clearIntavePackets()
+                        drainOneIntavePacket()
                     }
                 } else clearIntavePackets()
             } else clearIntavePackets()
@@ -785,6 +799,17 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
         if (stopRendering) {
             shouldRender = false
         }
+    }
+
+    /**
+     * Releases exactly one packet from the Intave queue per call.
+     * Used instead of [clearIntavePackets] in situations where flushing everything
+     * at once would create a suspicious burst of position updates on the server.
+     */
+    private fun drainOneIntavePacket() {
+        val oldest = intavePacketQueue.poll() ?: return
+        PacketUtils.schedulePacketProcess(oldest.packet)
+        intavePositions.poll()
     }
 
     private fun addBacktrackData(id: UUID, x: Double, y: Double, z: Double, time: Long) {
