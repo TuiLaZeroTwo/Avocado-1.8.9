@@ -14,8 +14,8 @@ import net.minecraft.util.EnumParticleTypes
 object AttackEffects : Module("AttackEffects", Category.RENDER) {
 
     private val particle by choices(
-        "Particle",
-        arrayOf("None", "Blood", "Lighting", "Fire", "Heart", "Water", "Smoke", "Magic", "Crits"), "Blood"
+        "None",
+        arrayOf("None", "Blood", "Lighting", "Fire"), "Blood"
     )
 
     private val amount by int("ParticleAmount", 5, 1..20) { particle != "None" }
@@ -50,12 +50,7 @@ object AttackEffects : Module("AttackEffects", Category.RENDER) {
     private fun doEffect(target: EntityLivingBase) {
         when (particle) {
             "Blood" -> spawnBloodParticle(EnumParticleTypes.BLOCK_CRACK, target)
-            "Crits" -> spawnEffectParticle(EnumParticleTypes.CRIT, target)
-            "Magic" -> spawnEffectParticle(EnumParticleTypes.CRIT_MAGIC, target)
             "Lighting" -> spawnLightning(target)
-            "Smoke" -> spawnEffectParticle(EnumParticleTypes.SMOKE_NORMAL, target)
-            "Water" -> spawnEffectParticle(EnumParticleTypes.WATER_DROP, target)
-            "Heart" -> spawnEffectParticle(EnumParticleTypes.HEART, target)
             "Fire" -> spawnEffectParticle(EnumParticleTypes.LAVA, target)
         }
     }

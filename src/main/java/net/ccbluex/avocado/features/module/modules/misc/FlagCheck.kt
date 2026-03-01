@@ -18,6 +18,7 @@ import net.ccbluex.avocado.utils.render.RenderUtils.drawPosBox
 import net.ccbluex.avocado.utils.render.RenderUtils.enableGlCap
 import net.ccbluex.avocado.utils.render.RenderUtils.resetCaps
 import net.minecraft.client.gui.GuiGameOver
+import net.minecraft.client.renderer.GlStateManager
 import net.minecraft.init.Blocks
 import net.minecraft.network.login.server.S00PacketDisconnect
 import net.minecraft.network.play.client.C08PacketPlayerBlockPlacement
@@ -32,10 +33,9 @@ import kotlin.math.sqrt
 
 object FlagCheck : Module("FlagCheck", Category.MISC, gameDetecting = true) {
 
-    // TODO: Model & Wireframe Render
     private val renderServerPos by choices(
         "RenderServerPos-Mode",
-        arrayOf("None", "Box"),
+        arrayOf("None", "Box", "Model", "Wireframe"),
         "None",
     ).subjective()
 
@@ -53,16 +53,16 @@ object FlagCheck : Module("FlagCheck", Category.MISC, gameDetecting = true) {
         this,
         "TextColor",
         applyMax = true
-    ) { renderServerPos == "Box" }
+    ) { renderServerPos != "None" }
 
     private val boxColors = ColorSettingsInteger(
         this,
         "BoxColor",
-    ) { renderServerPos == "Box" }.with(r = 255, g = 255)
+    ) { renderServerPos != "None" }.with(r = 255, g = 255)
 
-    private val scale by float("Scale", 1F, 1F..6F) { renderServerPos == "Box" }
-    private val font by font("Font", Fonts.fontSemibold40) { renderServerPos == "Box" }
-    private val fontShadow by boolean("Shadow", true) { renderServerPos == "Box" }
+    private val scale by float("Scale", 1F, 1F..6F) { renderServerPos != "None" }
+    private val font by font("Font", Fonts.fontSemibold40) { renderServerPos != "None" }
+    private val fontShadow by boolean("Shadow", true) { renderServerPos != "None" }
 
     private var lastCheckTime = 0L
 
@@ -95,6 +95,9 @@ object FlagCheck : Module("FlagCheck", Category.MISC, gameDetecting = true) {
     private var lastPosY = 0.0
     private var lastPosZ = 0.0
 
+    private var lastServerEntityWidth = 0.0f
+    private var lastServerEntityHeight = 0.0f
+
     private var resetTicks = 0
 
     override fun onDisable() {
@@ -118,6 +121,8 @@ object FlagCheck : Module("FlagCheck", Category.MISC, gameDetecting = true) {
 
             lastServerPos = Vec3(packet.x, packet.y, packet.z)
             serverPosTime = System.currentTimeMillis()
+            lastServerEntityWidth = player.width
+            lastServerEntityHeight = player.height
 
             if (deltaYaw > 90 || deltaPitch > 90) {
                 forceRotateDetected = true
@@ -262,7 +267,7 @@ object FlagCheck : Module("FlagCheck", Category.MISC, gameDetecting = true) {
         val renderManager = mc.renderManager
         val pos = lastServerPos ?: return@handler
 
-        if (renderServerPos != "Box") return@handler
+        if (renderServerPos == "None") return@handler
 
         val remainingTime = ((6000 - (System.currentTimeMillis() - serverPosTime)) / 1000).coerceAtLeast(0)
         val text = "Last Position: ${remainingTime}sec"
@@ -300,14 +305,55 @@ object FlagCheck : Module("FlagCheck", Category.MISC, gameDetecting = true) {
         glPopMatrix()
         glPopAttrib()
 
-        drawPosBox(
-            lastServerPos!!.xCoord,
-            lastServerPos!!.yCoord,
-            lastServerPos!!.zCoord,
-            0.8F, 2F,
-            boxColors.color(),
-            true
-        )
+        when (renderServerPos) {
+            "Box" -> {
+                drawPosBox(
+                    pos.xCoord,
+                    pos.yCoord,
+                    pos.zCoord,
+                    0.8F, 2F,
+                    boxColors.color(),
+                    true
+                )
+            }
+            "Model", "Wireframe" -> {
+                val baseBox = net.minecraft.util.AxisAlignedBB.fromBounds(
+                    pos.xCoord - lastServerEntityWidth / 2.0,
+                    pos.yCoord,
+                    pos.zCoord - lastServerEntityWidth / 2.0,
+                    pos.xCoord + lastServerEntityWidth / 2.0,
+                    pos.yCoord + lastServerEntityHeight,
+                    pos.zCoord + lastServerEntityWidth / 2.0
+                )
+                
+                val offsetBox = baseBox.offset(-renderManager.renderPosX, -renderManager.renderPosY, -renderManager.renderPosZ)
+
+                val color = boxColors.color()
+                
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+                enableGlCap(GL_BLEND)
+                disableGlCap(GL_TEXTURE_2D, GL_DEPTH_TEST)
+                glDepthMask(false)
+                
+                if (renderServerPos == "Wireframe") {
+                    glLineWidth(2f)
+                    enableGlCap(GL_LINE_SMOOTH)
+                    GlStateManager.color(color.red / 255f, color.green / 255f, color.blue / 255f, 255 / 255f)
+                    net.ccbluex.avocado.utils.render.RenderUtils.drawSelectionBoundingBox(offsetBox)
+                } else {
+                    GlStateManager.color(color.red / 255f, color.green / 255f, color.blue / 255f, 75 / 255f)
+                    net.ccbluex.avocado.utils.render.RenderUtils.drawFilledBox(offsetBox)
+                    glLineWidth(1.5f)
+                    enableGlCap(GL_LINE_SMOOTH)
+                    GlStateManager.color(color.red / 255f, color.green / 255f, color.blue / 255f, 200 / 255f)
+                    net.ccbluex.avocado.utils.render.RenderUtils.drawSelectionBoundingBox(offsetBox)
+                }
+                
+                GlStateManager.color(1f, 1f, 1f, 1f)
+                glDepthMask(true)
+                resetCaps()
+            }
+        }
     }
 
     val onTick = handler<GameTickEvent> {

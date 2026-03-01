@@ -16,7 +16,6 @@ import net.ccbluex.avocado.utils.block.isReplaceable
 import net.ccbluex.avocado.utils.client.PacketUtils.sendPacket
 import net.ccbluex.avocado.utils.extensions.onPlayerRightClick
 import net.ccbluex.avocado.utils.extensions.sendUseItem
-import net.ccbluex.avocado.utils.extensions.toDegreesF
 import net.ccbluex.avocado.utils.inventory.InventoryUtils
 import net.ccbluex.avocado.utils.inventory.SilentHotbar
 import net.ccbluex.avocado.utils.inventory.hotBarSlot
@@ -27,12 +26,8 @@ import net.minecraft.init.Items
 import net.minecraft.item.ItemBucket
 import net.minecraft.network.play.client.C03PacketPlayer.C05PacketPlayerLook
 import net.minecraft.util.EnumFacing
-import net.minecraft.util.MathHelper
 import net.minecraft.util.Vec3
-import kotlin.math.atan2
-import kotlin.math.sqrt
 
-// TODO: This desperately needs a recode
 object Ignite : Module("Ignite", Category.COMBAT) {
 
     private val lighter by boolean("Lighter", true)
@@ -66,23 +61,10 @@ object Ignite : Module("Ignite", Category.COMBAT) {
                 val itemStack = player.hotBarSlot(fireInHotbar).stack
 
                 if (itemStack.item is ItemBucket) {
-                    val diffX = blockPos.x + 0.5 - player.posX
-                    val diffY = blockPos.y + 0.5 - (player.entityBoundingBox.minY + player.eyeHeight)
-                    val diffZ = blockPos.z + 0.5 - player.posZ
-                    val sqrt = sqrt(diffX * diffX + diffZ * diffZ)
-                    val yaw = (atan2(diffZ, diffX)).toDegreesF() - 90F
-                    val pitch = -(atan2(diffY, sqrt)).toDegreesF()
-
-                    sendPacket(
-                        C05PacketPlayerLook(
-                            player.rotationYaw +
-                                    MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw),
-                            player.rotationPitch +
-                                    MathHelper.wrapAngleTo180_float(pitch - player.rotationPitch),
-                            player.onGround
-                        )
-                    )
-
+                    val targetVec = Vec3(blockPos.x + 0.5, blockPos.y + 0.5, blockPos.z + 0.5)
+                    val rotation = RotationUtils.toRotation(targetVec)
+                    
+                    sendPacket(C05PacketPlayerLook(rotation.yaw, rotation.pitch, player.onGround))
                     player.sendUseItem(itemStack)
                 } else {
                     for (side in EnumFacing.entries) {
@@ -91,22 +73,10 @@ object Ignite : Module("Ignite", Category.COMBAT) {
                         if (!neighbor.canBeClicked())
                             continue
 
-                        val diffX = neighbor.x + 0.5 - player.posX
-                        val diffY = neighbor.y + 0.5 - (player.entityBoundingBox.minY + player.eyeHeight)
-                        val diffZ = neighbor.z + 0.5 - player.posZ
-                        val sqrt = sqrt(diffX * diffX + diffZ * diffZ)
-                        val yaw = (atan2(diffZ, diffX)).toDegreesF() - 90F
-                        val pitch = -(atan2(diffY, sqrt)).toDegreesF()
+                        val targetVec = Vec3(neighbor.x + 0.5, neighbor.y + 0.5, neighbor.z + 0.5)
+                        val rotation = RotationUtils.toRotation(targetVec)
 
-                        sendPacket(
-                            C05PacketPlayerLook(
-                                player.rotationYaw +
-                                        MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw),
-                                player.rotationPitch +
-                                        MathHelper.wrapAngleTo180_float(pitch - player.rotationPitch),
-                                player.onGround
-                            )
-                        )
+                        sendPacket(C05PacketPlayerLook(rotation.yaw, rotation.pitch, player.onGround))
 
                         if (player.onPlayerRightClick(neighbor, side.opposite, Vec3(side.directionVec), itemStack)) {
                             player.swingItem()

@@ -48,7 +48,6 @@ object Regen : Module("Regen", Category.PLAYER) {
     val onUpdate = handler<UpdateEvent> {
         if (resetTimer) {
             mc.timer.timerSpeed = 1F
-        } else {
             resetTimer = false
         }
 

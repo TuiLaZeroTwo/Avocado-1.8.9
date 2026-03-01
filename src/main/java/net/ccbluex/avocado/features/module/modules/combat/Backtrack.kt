@@ -73,8 +73,12 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
     private val smart by boolean("Smart", true) { mode == "Modern" }
 
     // Intave
-    private val intaveMaxDelay by int("Intave-MaxDelay", 120, 50..400) { mode == "Intave" }
-    private val intaveMinDelay by int("Intave-MinDelay", 80, 20..300) { mode == "Intave" }
+    private val intaveMaxDelay: Value<Int> = int("Intave-MaxDelay", 120, 50..400) { mode == "Intave" }.onChange { _, new ->
+        new.coerceAtLeast(intaveMinDelay.get())
+    }
+    private val intaveMinDelay: Value<Int> = int("Intave-MinDelay", 80, 20..300) { mode == "Intave" }.onChange { _, new ->
+        new.coerceAtMost(intaveMaxDelay.get())
+    }
     private val intaveMaxDist by float("Intave-MaxDist", 6f, 3f..8f) { mode == "Intave" }
     private val intaveSmart by boolean("Intave-Smart", true) { mode == "Intave" }
 
@@ -494,7 +498,7 @@ object Backtrack : Module("Backtrack", Category.COMBAT) {
         if (event.targetEntity is EntityLivingBase) {
             target = event.targetEntity
             if (mode == "Intave") {
-                intaveCurrentDelay = randomDelay(intaveMinDelay, intaveMaxDelay).toLong()
+                intaveCurrentDelay = randomDelay(intaveMinDelay.get(), intaveMaxDelay.get()).toLong()
             }
         }
     }

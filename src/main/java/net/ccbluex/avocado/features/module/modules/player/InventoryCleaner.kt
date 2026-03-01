@@ -53,11 +53,15 @@ object InventoryCleaner : Module("InventoryCleaner", Category.PLAYER) {
         5,
         0..36,
     ) { limitStackCounts }.subjective()
-    // TODO: max potion, vehicle, ..., stacks?
+
+    private val maxPotionStacks by int("MaxPotionStacks", 5, 0..36) { limitStackCounts }.subjective()
 
     private val maxFishingRodStacks by int("MaxFishingRodStacks", 1, 1..10).subjective()
 
     private val mergeStacks by boolean("MergeStacks", true).subjective()
+    
+    // Added slider for merge delay
+    private val mergeDelay by int("MergeDelay", 100, 0..500) { mergeStacks }.subjective()
 
     private val repairEquipment by boolean("RepairEquipment", true).subjective()
 
@@ -178,13 +182,11 @@ object InventoryCleaner : Module("InventoryCleaner", Category.PLAYER) {
 
                 if (isTicked(index)) continue
 
-                // TODO: Perhaps add a slider for merge delay?
+                click(index, 0, 0, coerceTo = mergeDelay)
 
-                click(index, 0, 0, coerceTo = 100)
+                click(index, 0, 6, allowDuplicates = true, coerceTo = mergeDelay)
 
-                click(index, 0, 6, allowDuplicates = true, coerceTo = 100)
-
-                click(index, 0, 0, allowDuplicates = true, coerceTo = 100)
+                click(index, 0, 0, allowDuplicates = true, coerceTo = mergeDelay)
             }
 
             if (indicesToDoubleClick.isEmpty())
@@ -455,7 +457,7 @@ object InventoryCleaner : Module("InventoryCleaner", Category.PLAYER) {
         return SORTING_TARGETS[SORTING_VALUES.getOrNull(index)?.get()]?.invoke(item) == true
     }
 
-    // TODO: Simplify all is useful checks by a single getBetterAlternativeCount and checking if it is above 0, above stack limit, ...
+
     fun isStackUseful(
         stack: ItemStack?, stacks: List<ItemStack?>, entityStacksMap: Map<ItemStack, EntityItem>? = null,
         noLimits: Boolean = false, strictlyBest: Boolean = false,
@@ -478,7 +480,7 @@ object InventoryCleaner : Module("InventoryCleaner", Category.PLAYER) {
 
             is ItemBoat, is ItemMinecart -> !ignoreVehicles
 
-            is ItemPotion -> isUsefulPotion(stack)
+            is ItemPotion -> isUsefulPotion(stack, stacks)
 
             is ItemBucket -> isUsefulBucket(stack, stacks, entityStacksMap)
 
@@ -540,7 +542,7 @@ object InventoryCleaner : Module("InventoryCleaner", Category.PLAYER) {
         }
     }
 
-    private fun isUsefulPotion(stack: ItemStack?): Boolean {
+    private fun isUsefulPotion(stack: ItemStack?, stacks: List<ItemStack?>): Boolean {
         val item = stack?.item ?: return false
 
         if (item !is ItemPotion) return false
@@ -549,7 +551,16 @@ object InventoryCleaner : Module("InventoryCleaner", Category.PLAYER) {
         val isHarmful = item.getEffects(stack)?.any { it.potionID in NEGATIVE_EFFECT_IDS } ?: return false
 
         // Only keep helpful potions and, if 'onlyGoodPotions' is disabled, also splash harmful potions
-        return !isHarmful || (!onlyGoodPotions && isSplash)
+        val isUseful = !isHarmful || (!onlyGoodPotions && isSplash)
+        
+        if (!isUseful) return false
+        
+        val usefulPotionsCount = stacks.count { 
+            it?.item is ItemPotion && 
+            (!(it.item as ItemPotion).getEffects(it)?.any { eff -> eff.potionID in NEGATIVE_EFFECT_IDS }!! || (!onlyGoodPotions && it.isSplashPotion())) 
+        }
+
+        return usefulPotionsCount <= maxPotionStacks || stacks.indexOf(stack) >= stacks.indexOfLast { it == stack } // Basic limit
     }
 
     private fun isUsefulLighter(
@@ -599,75 +610,69 @@ object InventoryCleaner : Module("InventoryCleaner", Category.PLAYER) {
         }
     }
 
+    private fun getBetterAlternativeCount(
+        stack: ItemStack,
+        stacks: List<ItemStack?>,
+        entityStacksMap: Map<ItemStack, EntityItem>?,
+        isValid: (ItemStack) -> Boolean,
+        compareSize: (ItemStack) -> Float
+    ): Int {
+        val index = stacks.indexOf(stack)
+        val isSorted = canBeSortedTo(index, stack.item, stacks.size)
+        val stackStat = compareSize(stack)
+
+        val stacksToIterate = stacks.toMutableList()
+        var distanceSqToItem = .0
+
+        if (!entityStacksMap.isNullOrEmpty()) {
+            distanceSqToItem = mc.thePlayer.getDistanceSqToEntity(entityStacksMap[stack] ?: return 0)
+            stacksToIterate += entityStacksMap.keys
+        }
+
+        return stacksToIterate.withIndex().count { (otherIndex, otherStack) ->
+            if (otherStack == null || stack == otherStack || !isValid(otherStack)) return@count false
+
+            // Items dropped on ground should have index -1
+            val actualOtherIndex = if (otherIndex > stacks.lastIndex) -1 else otherIndex
+
+            val otherStat = compareSize(otherStack)
+
+            when (otherStat.compareTo(stackStat)) {
+                1 -> true // Other stack is better
+                0 -> {
+                    // Both stacks are equally good
+                    if (index == actualOtherIndex) {
+                        val otherEntityItem = entityStacksMap?.get(otherStack) ?: return@count false
+                        distanceSqToItem > mc.thePlayer.getDistanceSqToEntity(otherEntityItem)
+                    } else {
+                        val isOtherSorted = canBeSortedTo(actualOtherIndex, otherStack.item, stacks.size)
+                        !isSorted && (isOtherSorted || actualOtherIndex > index)
+                    }
+                }
+                else -> false
+            }
+        }
+    }
+
     private fun isUsefulFood(
         stack: ItemStack?, stacks: List<ItemStack?>, entityStacksMap: Map<ItemStack, EntityItem>?,
         ignoreLimits: Boolean, strictlyBest: Boolean,
     ): Boolean {
         val item = stack?.item ?: return false
-
         if (item !is ItemFood) return false
 
-        // Skip checks if there is no stack limit set and when you are not strictly searching for best option
         if (ignoreLimits || !limitStackCounts) {
-            if (!strictlyBest)
-                return true
-            // Skip checks if limit is set to 0
-        } else if (maxFoodStacks == 0)
+            if (!strictlyBest) return true
+        } else if (maxFoodStacks == 0) {
             return false
-
-        val stackSaturation = item.getSaturationModifier(stack) * stack.stackSize
-
-        val index = stacks.indexOf(stack)
-
-        val isSorted = canBeSortedTo(index, item, stacks.size)
-
-        val stacksToIterate = stacks.toMutableList()
-
-        var distanceSqToItem = .0
-
-        if (!entityStacksMap.isNullOrEmpty()) {
-            distanceSqToItem = mc.thePlayer.getDistanceSqToEntity(entityStacksMap[stack] ?: return false)
-            stacksToIterate += entityStacksMap.keys
         }
 
-        val betterCount = stacksToIterate.withIndex().count { (otherIndex, otherStack) ->
-            if (stack == otherStack)
-                return@count false
+        val betterCount = getBetterAlternativeCount(
+            stack, stacks, entityStacksMap,
+            isValid = { it.item is ItemFood },
+            compareSize = { (it.item as ItemFood).getSaturationModifier(it) * it.stackSize.toFloat() }
+        )
 
-            val otherItem = otherStack?.item ?: return@count false
-
-            if (otherItem !is ItemFood)
-                return@count false
-
-            // Items dropped on ground should have index -1
-            val otherIndex = if (otherIndex > stacks.lastIndex) -1 else otherIndex
-
-            val otherStackSaturation = otherItem.getSaturationModifier(otherStack) * otherStack.stackSize
-
-            when (otherStackSaturation.compareTo(stackSaturation)) {
-                // Other stack has bigger saturation sum
-                1 -> true
-                // Both stacks are equally good
-                0 -> {
-                    // Only true when both items are dropped on ground
-                    if (index == otherIndex) {
-                        val otherEntityItem = entityStacksMap?.get(otherStack) ?: return@count false
-
-                        // If other item is closer, count it as better
-                        distanceSqToItem > mc.thePlayer.getDistanceSqToEntity(otherEntityItem)
-                    } else {
-                        val isOtherSorted = canBeSortedTo(otherIndex, otherItem, stacks.size)
-
-                        // Count as better alternative only when compared stack isn't sorted and the other is sorted, or has higher index
-                        !isSorted && (isOtherSorted || otherIndex > index)
-                    }
-                }
-
-                else -> false
-            }
-        }
-
-        // If sorting is checking if item is strictly the best option, only return true for items that have no better alternatives
         return if (strictlyBest) betterCount == 0 else betterCount < maxFoodStacks
     }
 
@@ -677,58 +682,18 @@ object InventoryCleaner : Module("InventoryCleaner", Category.PLAYER) {
     ): Boolean {
         if (!isSuitableBlock(stack)) return false
 
-        // Skip checks if there is no stack limit set and when you are not strictly searching for best option
         if (ignoreLimits || !limitStackCounts) {
-            if (!strictlyBest)
-                return true
-            // Skip checks if limit is set to 0
-        } else if (maxBlockStacks == 0)
+            if (!strictlyBest) return true
+        } else if (maxBlockStacks == 0) {
             return false
-
-        val index = stacks.indexOf(stack)
-
-        val isSorted = canBeSortedTo(index, stack!!.item, stacks.size)
-
-        val stacksToIterate = stacks.toMutableList()
-
-        var distanceSqToItem = .0
-
-        if (!entityStacksMap.isNullOrEmpty()) {
-            distanceSqToItem = mc.thePlayer.getDistanceSqToEntity(entityStacksMap[stack] ?: return false)
-            stacksToIterate += entityStacksMap.keys
         }
 
-        val betterCount = stacksToIterate.withIndex().count { (otherIndex, otherStack) ->
-            if (otherStack == stack || !isSuitableBlock(otherStack))
-                return@count false
+        val betterCount = getBetterAlternativeCount(
+            stack!!, stacks, entityStacksMap,
+            isValid = { isSuitableBlock(it) },
+            compareSize = { it.stackSize.toFloat() }
+        )
 
-            // Items dropped on ground should have index -1
-            val otherIndex = if (otherIndex > stacks.lastIndex) -1 else otherIndex
-
-            when (otherStack!!.stackSize.compareTo(stack.stackSize)) {
-                // Found a stack that has higher size
-                1 -> true
-                // Both stacks are equally good
-                0 -> {
-                    // Only true when both items are dropped on ground
-                    if (index == otherIndex) {
-                        val otherEntityItem = entityStacksMap?.get(otherStack) ?: return@count false
-
-                        // If other item is closer, count it as better
-                        distanceSqToItem > mc.thePlayer.getDistanceSqToEntity(otherEntityItem)
-                    } else {
-                        val isOtherSorted = canBeSortedTo(otherIndex, otherStack.item, stacks.size)
-
-                        // Count as better alternative only when compared stack isn't sorted and the other is sorted, or has higher index
-                        !isSorted && (isOtherSorted || otherIndex > index)
-                    }
-                }
-
-                else -> false
-            }
-        }
-
-        // If sorting is checking if item is strictly the best option, only return true for items that have no better alternatives
         return if (strictlyBest) betterCount == 0 else betterCount < maxBlockStacks
     }
 
@@ -737,65 +702,20 @@ object InventoryCleaner : Module("InventoryCleaner", Category.PLAYER) {
         entityStacksMap: Map<ItemStack, EntityItem>?, ignoreLimits: Boolean, strictlyBest: Boolean,
     ): Boolean {
         val item = stack?.item ?: return false
-
         if (item !in THROWABLE_ITEMS) return false
 
-        // Skip checks if there is no stack limit set and when you are not strictly searching for best option
         if (ignoreLimits || !limitStackCounts) {
-            if (!strictlyBest)
-                return true
-            // Skip checks if limit is set to 0
-        } else if (maxBlockStacks == 0)
+            if (!strictlyBest) return true
+        } else if (maxThrowableStacks == 0) {
             return false
-
-        val index = stacks.indexOf(stack)
-
-        val isSorted = canBeSortedTo(index, item, stacks.size)
-
-        val stacksToIterate = stacks.toMutableList()
-
-        var distanceSqToItem = .0
-
-        if (!entityStacksMap.isNullOrEmpty()) {
-            distanceSqToItem = mc.thePlayer.getDistanceSqToEntity(entityStacksMap[stack] ?: return false)
-            stacksToIterate += entityStacksMap.keys
         }
 
-        val betterCount = stacksToIterate.withIndex().count { (otherIndex, otherStack) ->
-            if (otherStack == stack)
-                return@count false
+        val betterCount = getBetterAlternativeCount(
+            stack, stacks, entityStacksMap,
+            isValid = { it.item in THROWABLE_ITEMS },
+            compareSize = { it.stackSize.toFloat() }
+        )
 
-            val otherItem = otherStack?.item ?: return@count false
-
-            if (otherItem !in THROWABLE_ITEMS) return@count false
-
-            // Items dropped on ground should have index -1
-            val otherIndex = if (otherIndex > stacks.lastIndex) -1 else otherIndex
-
-            when (otherStack.stackSize.compareTo(stack.stackSize)) {
-                // Found a stack that has higher size
-                1 -> true
-                // Both stacks are equally good
-                0 -> {
-                    // Only true when both items are dropped on ground
-                    if (index == otherIndex) {
-                        val otherEntityItem = entityStacksMap?.get(otherStack) ?: return@count false
-
-                        // If other item is closer, count it as better
-                        distanceSqToItem > mc.thePlayer.getDistanceSqToEntity(otherEntityItem)
-                    } else {
-                        val isOtherSorted = canBeSortedTo(otherIndex, otherStack.item, stacks.size)
-
-                        // Count as better alternative only when compared stack isn't sorted and the other is sorted, or has higher index
-                        !isSorted && (isOtherSorted || otherIndex > index)
-                    }
-                }
-
-                else -> false
-            }
-        }
-
-        // If sorting is checking if item is strictly the best option, only return true for items that have no better alternatives
         return if (strictlyBest) betterCount == 0 else betterCount < maxThrowableStacks
     }
 

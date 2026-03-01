@@ -24,28 +24,20 @@ import java.awt.Color
 
 object TickBase : Module("TickBase", Category.COMBAT) {
 
-    private val mode by choices("Mode", arrayOf("Past", "Future", "Intave"), "Past")
+    private val mode by choices("Mode", arrayOf("Past", "Future"), "Past")
     private val onlyOnKillAura by boolean("OnlyOnKillAura", true)
 
     private val change by int("Changes", 100, 0..100)
 
-    private val balanceMaxValue by int("BalanceMaxValue", 100, 1..1000) { mode != "Intave" }
-    private val balanceRecoveryIncrement by float("BalanceRecoveryIncrement", 0.1f, 0.01f..10f) { mode != "Intave" }
-    private val maxTicksAtATime by int("MaxTicksAtATime", 20, 1..100) { mode != "Intave" }
+    private val balanceMaxValue by int("BalanceMaxValue", 100, 1..1000)
+    private val balanceRecoveryIncrement by float("BalanceRecoveryIncrement", 0.1f, 0.01f..10f)
+    private val maxTicksAtATime by int("MaxTicksAtATime", 20, 1..100)
 
     private val rangeToAttack by floatRange("RangeToAttack", 3f..5f, 0f..10f)
 
     private val forceGround by boolean("ForceGround", false)
-    private val pauseAfterTick by int("PauseAfterTick", 0, 0..100) { mode != "Intave" }
+    private val pauseAfterTick by int("PauseAfterTick", 0, 0..100)
     private val pauseOnFlag by boolean("PauseOnFlag", true)
-
-    private val intaveMaxTicks by int("Intave-MaxTicks", 4, 1..6) { mode == "Intave" }
-    private val intaveSpreadRate by int("Intave-SpreadRate", 2, 1..3) { mode == "Intave" }
-    private val intaveBalanceMax by int("Intave-BalanceMax", 20, 5..40) { mode == "Intave" }
-    private val intaveBalanceRecovery by float("Intave-BalanceRecovery", 0.4f, 0.1f..1f) { mode == "Intave" }
-    private val intaveLagbackCooldown by int("Intave-LagbackCooldown", 3000, 500..10000) { mode == "Intave" }
-    private val intaveGroundOnly by boolean("Intave-GroundOnly", true) { mode == "Intave" }
-    private val intaveJitter by int("Intave-Jitter", 1, 0..3) { mode == "Intave" }
 
     private val line by boolean("Line", true).subjective()
     private val lineColor by color("LineColor", Color.GREEN) { line }.subjective()
@@ -56,19 +48,11 @@ object TickBase : Module("TickBase", Category.COMBAT) {
     private val tickBuffer = mutableListOf<TickData>()
     var duringTickModification = false
 
-    private var intavePendingTicks = 0
-    private var intaveCompensationTicks = 0
-    private var intaveLastLagback = 0L
-    private var intaveSpreading = false
-
     override val tag
         get() = mode
 
     override fun onToggle(state: Boolean) {
         duringTickModification = false
-        intavePendingTicks = 0
-        intaveCompensationTicks = 0
-        intaveSpreading = false
     }
 
     val onPreTick = handler<PlayerTickEvent> { event ->
@@ -81,11 +65,6 @@ object TickBase : Module("TickBase", Category.COMBAT) {
         if (event.state == EventState.PRE && ticksToSkip-- > 0) {
             event.cancelEvent()
         }
-
-        if (mode == "Intave" && event.state == EventState.PRE && intaveCompensationTicks > 0) {
-            event.cancelEvent()
-            intaveCompensationTicks--
-        }
     }
 
     private var modificationFlag = false
@@ -93,29 +72,6 @@ object TickBase : Module("TickBase", Category.COMBAT) {
         if (modificationFlag) {
             modificationFlag = false
             duringTickModification = false
-        }
-
-        if (mode == "Intave" && intavePendingTicks > 0) {
-            val player = mc.thePlayer ?: return@handler
-
-            val ticksThisFrame = if (intaveJitter > 0 && RandomUtils.nextInt(endExclusive = intaveJitter + 1) == 0) {
-                minOf(intavePendingTicks, 1)
-            } else {
-                minOf(intavePendingTicks, intaveSpreadRate)
-            }
-
-            repeat(ticksThisFrame) {
-                player.onUpdate()
-                tickBalance -= 1
-            }
-
-            intavePendingTicks -= ticksThisFrame
-
-            if (intavePendingTicks <= 0) {
-                intavePendingTicks = 0
-                intaveSpreading = false
-                modificationFlag = true
-            }
         }
     }
 
@@ -130,13 +86,7 @@ object TickBase : Module("TickBase", Category.COMBAT) {
             val nearbyEnemy = getNearestEntityInRange() ?: return@handler
             val currentDistance = player.positionVector.distanceTo(nearbyEnemy.positionVector)
 
-            if (mode == "Intave") {
-                if (intaveGroundOnly && !player.onGround) return@handler
-                if (System.currentTimeMillis() - intaveLastLagback < intaveLagbackCooldown) return@handler
-                if (intaveSpreading) return@handler
-            }
-
-            val effectiveMaxTicks = if (mode == "Intave") intaveMaxTicks else maxTicksAtATime
+            val effectiveMaxTicks = maxTicksAtATime
 
             val possibleTicks = tickBuffer.mapIndexedNotNull { index, tick ->
                 val tickDistance = tick.position.distanceTo(nearbyEnemy.positionVector)
@@ -162,38 +112,25 @@ object TickBase : Module("TickBase", Category.COMBAT) {
 
             duringTickModification = true
 
-            if (mode == "Intave") {
-                val ticksToUse = bestTick.coerceAtMost(effectiveMaxTicks)
+            val skipTicks = (bestTick + pauseAfterTick).coerceAtMost(effectiveMaxTicks + pauseAfterTick)
 
-                intavePendingTicks = ticksToUse
-                intaveSpreading = true
+            fun tick() {
+                repeat(skipTicks) {
+                    player.onUpdate()
+                    tickBalance -= 1
+                }
+            }
 
-                intaveCompensationTicks = ticksToUse
-
-                ticksToSkip = ticksToUse
-                waitTicks(ticksToUse)
-
+            if (mode == "Past") {
+                ticksToSkip = skipTicks
+                waitTicks(skipTicks)
+                tick()
+                modificationFlag = true
             } else {
-                val skipTicks = (bestTick + pauseAfterTick).coerceAtMost(effectiveMaxTicks + pauseAfterTick)
-
-                fun tick() {
-                    repeat(skipTicks) {
-                        player.onUpdate()
-                        tickBalance -= 1
-                    }
-                }
-
-                if (mode == "Past") {
-                    ticksToSkip = skipTicks
-                    waitTicks(skipTicks)
-                    tick()
-                    modificationFlag = true
-                } else {
-                    tick()
-                    ticksToSkip = skipTicks
-                    waitTicks(skipTicks)
-                    modificationFlag = true
-                }
+                tick()
+                ticksToSkip = skipTicks
+                waitTicks(skipTicks)
+                modificationFlag = true
             }
         }
     }
@@ -211,9 +148,9 @@ object TickBase : Module("TickBase", Category.COMBAT) {
 
         simulatedPlayer.rotationYaw = RotationUtils.currentRotation?.yaw ?: player.rotationYaw
 
-        val effectiveBalanceMax = if (mode == "Intave") intaveBalanceMax else balanceMaxValue
-        val effectiveRecovery = if (mode == "Intave") intaveBalanceRecovery else balanceRecoveryIncrement
-        val effectiveMaxTicks = if (mode == "Intave") intaveMaxTicks else maxTicksAtATime
+        val effectiveBalanceMax = balanceMaxValue
+        val effectiveRecovery = balanceRecoveryIncrement
+        val effectiveMaxTicks = maxTicksAtATime
 
         if (tickBalance <= 0) {
             reachedTheLimit = true
@@ -286,14 +223,6 @@ object TickBase : Module("TickBase", Category.COMBAT) {
     val onPacket = handler<PacketEvent> { event ->
         if (event.packet is S08PacketPlayerPosLook && pauseOnFlag) {
             tickBalance = 0f
-
-            if (mode == "Intave") {
-                intaveLastLagback = System.currentTimeMillis()
-                intavePendingTicks = 0
-                intaveCompensationTicks = 0
-                intaveSpreading = false
-                duringTickModification = false
-            }
         }
     }
 
