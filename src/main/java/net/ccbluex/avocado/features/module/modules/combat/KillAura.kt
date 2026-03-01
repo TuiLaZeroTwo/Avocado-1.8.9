@@ -321,6 +321,9 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
     private var clicks = 0
     private var attackTickTimes = mutableListOf<Pair<MovingObjectPosition, Int>>()
 
+    // Per-entity cooldown timers for Multi mode (UUID -> MSTimer)
+    private val multiEntityTimers = mutableMapOf<java.util.UUID, MSTimer>()
+
     // Container Delay
     private var containerOpen = -1L
 
@@ -348,6 +351,7 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
         attackTickTimes.clear()
         attackTimer.reset()
         clicks = 0
+        multiEntityTimers.clear()
 
         if (blinkAutoBlock) {
             BlinkUtils.unblink()
@@ -382,6 +386,7 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
 
     val onWorld = handler<WorldEvent> {
         attackTickTimes.clear()
+        multiEntityTimers.clear()
 
         if (blinkAutoBlock && BlinkUtils.isBlinking) BlinkUtils.unblink()
 
@@ -712,6 +717,11 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
                 val distance = player.getDistanceToEntityBox(entity)
 
                 if (entity is EntityLivingBase && isSelected(entity, true) && distance <= getRange(entity)) {
+                    // Per-entity cooldown: each entity gets its own timer matching the current attack delay
+                    val entityTimer = multiEntityTimers.getOrPut(entity.uniqueID) { MSTimer() }
+                    if (!entityTimer.hasTimePassed(attackDelay.toLong())) continue
+                    entityTimer.reset()
+
                     attackEntity(entity, isLastClick)
 
                     targets += 1
@@ -719,6 +729,10 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
                     if (limitedMultiTargets != 0 && limitedMultiTargets <= targets) break
                 }
             }
+
+            // Prune timers for entities no longer in the world
+            val loadedIds = world.loadedEntityList.mapNotNull { (it as? EntityLivingBase)?.uniqueID }.toHashSet()
+            multiEntityTimers.keys.retainAll(loadedIds)
         }
 
         if (!isLastClick) return

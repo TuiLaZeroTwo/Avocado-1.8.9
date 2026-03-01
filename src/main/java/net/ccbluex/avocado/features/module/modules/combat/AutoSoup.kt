@@ -86,7 +86,7 @@ object AutoSoup : Module("AutoSoup", Category.COMBAT) {
 
             var bowlMovable = false
 
-            for (i in 9..36) {
+            for (i in 9..35) {
                 val itemStack = thePlayer.inventory.getStackInSlot(i)
 
                 if (itemStack == null || (itemStack.item == Items.bowl && itemStack.stackSize < 64)) {

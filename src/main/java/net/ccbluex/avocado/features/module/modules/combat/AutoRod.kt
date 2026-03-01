@@ -54,6 +54,11 @@ object AutoRod : Module("AutoRod", Category.COMBAT) {
     private var rodInUse = false
     private var switchBack = -1
 
+    override fun onDisable() {
+        rodInUse = false
+        switchBack = -1
+    }
+
     val onUpdate = handler<UpdateEvent> {
         // Check if player is using rod
         val usingRod = (mc.thePlayer.isUsingItem && mc.thePlayer.heldItem?.item == Items.fishing_rod) || rodInUse

@@ -27,6 +27,10 @@ object AutoWeapon : Module("AutoWeapon", Category.COMBAT, subjective = true) {
 
     private var attackEnemy = false
 
+    override fun onDisable() {
+        attackEnemy = false
+    }
+
     val onAttack = handler<AttackEvent> {
         attackEnemy = true
     }

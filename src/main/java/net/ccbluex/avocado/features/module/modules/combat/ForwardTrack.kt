@@ -69,7 +69,7 @@ object ForwardTrack : Module("ForwardTrack", Category.COMBAT) {
 
         for (target in world.loadedEntityList) {
             if (!isSelected(target, true)) {
-                return@handler
+                continue
             }
 
             val vec = usePosition(target)
