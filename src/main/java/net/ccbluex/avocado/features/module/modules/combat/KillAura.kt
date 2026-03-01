@@ -70,8 +70,7 @@ import net.minecraft.potion.Potion
 import net.minecraft.util.*
 import org.lwjgl.input.Keyboard
 import java.awt.Color
-import kotlin.math.max
-import kotlin.math.roundToInt
+import kotlin.math.*
 
 object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
     /**
@@ -94,10 +93,17 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
     private val clickOnly by boolean("ClickOnly", false)
 
     // Range
-    private val range: Float by float("Range", 3.7f, 1f..8f)
+    // TODO: Make block range independent from attack range
+    private val range: Float by float("Range", 3.7f, 1f..8f).onChanged {
+        blockRange = blockRange.coerceAtMost(it)
+    }
     private val scanRange by float("ScanRange", 2f, 0f..10f)
     private val throughWallsRange by float("ThroughWallsRange", 3f, 0f..8f)
     private val rangeSprintReduction by float("RangeSprintReduction", 0f, 0f..0.4f)
+
+    // Rotation randomization and closest point targeting
+    private val rotationRandomization by float("RotationRandomization", 0.1f, 0f..1f) { options.rotationsActive }
+    private val prioritizeClosestPoint by boolean("PrioritizeClosestPoint", true) { options.rotationsActive }
 
     // Modes
     private val priority by choices(
@@ -178,8 +184,11 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
     // Don't block if target isn't holding a sword or an axe
     private val checkWeapon by boolean("CheckEnemyWeapon", true) { smartAutoBlock }
 
-    private var blockRange: Float by float("BlockRange", 3.7f, 1f..8f) {
+    // TODO: Make block range independent from attack range
+    private var blockRange: Float by float("BlockRange", range, 1f..8f) {
         smartAutoBlock
+    }.onChange { _, new ->
+        new.coerceAtMost(range)
     }
 
     // Don't block when you can't get damaged
@@ -193,6 +202,13 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
 
     // Rotations
     private val options = RotationSettings(this).withoutKeepRotation()
+
+    // Rotation mode
+    private val rotationMode by choices("RotationMode", arrayOf("None", "Basic", "Smooth", "Legit", "Bezier"), "Basic")
+
+    // Bezier rotation settings
+    private val bezierFactor by float("BezierFactor", 0.5f, 0.1f..1.0f) { rotationMode == "Bezier" }
+    private val bezierRandomization by float("BezierRandomization", 0.1f, 0.0f..1.0f) { rotationMode == "Bezier" }
 
     // Raycast
     private val raycastValue = boolean("RayCast", true) { options.rotationsActive }
@@ -290,8 +306,8 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
     private val aimPointBoxSize by float("AimPointBoxSize", 0.1f, 0f..0.2F) { renderAimPointBox }.subjective()
 
     // Circle options
-    private val circleStartColor by color("CircleStartColor", Color.RED) { mark == "Circle" }.subjective()
-    private val circleEndColor by color("CircleEndColor", Color.PINK.withAlpha(0)) { mark == "Circle" }.subjective()
+    private val circleStartColor by color("CircleStartColor", Color.BLUE) { mark == "Circle" }.subjective()
+    private val circleEndColor by color("CircleEndColor", Color.CYAN.withAlpha(0)) { mark == "Circle" }.subjective()
     private val fillInnerCircle by boolean("FillInnerCircle", false) { mark == "Circle" }.subjective()
     private val withHeight by boolean("WithHeight", true) { mark == "Circle" }.subjective()
     private val animateHeight by boolean("AnimateHeight", false) { withHeight }.subjective()
@@ -321,9 +337,6 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
     private var clicks = 0
     private var attackTickTimes = mutableListOf<Pair<MovingObjectPosition, Int>>()
 
-    // Per-entity cooldown timers for Multi mode (UUID -> MSTimer)
-    private val multiEntityTimers = mutableMapOf<java.util.UUID, MSTimer>()
-
     // Container Delay
     private var containerOpen = -1L
 
@@ -351,7 +364,6 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
         attackTickTimes.clear()
         attackTimer.reset()
         clicks = 0
-        multiEntityTimers.clear()
 
         if (blinkAutoBlock) {
             BlinkUtils.unblink()
@@ -386,7 +398,6 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
 
     val onWorld = handler<WorldEvent> {
         attackTickTimes.clear()
-        multiEntityTimers.clear()
 
         if (blinkAutoBlock && BlinkUtils.isBlinking) BlinkUtils.unblink()
 
@@ -717,11 +728,6 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
                 val distance = player.getDistanceToEntityBox(entity)
 
                 if (entity is EntityLivingBase && isSelected(entity, true) && distance <= getRange(entity)) {
-                    // Per-entity cooldown: each entity gets its own timer matching the current attack delay
-                    val entityTimer = multiEntityTimers.getOrPut(entity.uniqueID) { MSTimer() }
-                    if (!entityTimer.hasTimePassed(attackDelay.toLong())) continue
-                    entityTimer.reset()
-
                     attackEntity(entity, isLastClick)
 
                     targets += 1
@@ -729,10 +735,6 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
                     if (limitedMultiTargets != 0 && limitedMultiTargets <= targets) break
                 }
             }
-
-            // Prune timers for entities no longer in the world
-            val loadedIds = world.loadedEntityList.mapNotNull { (it as? EntityLivingBase)?.uniqueID }.toHashSet()
-            multiEntityTimers.keys.retainAll(loadedIds)
         }
 
         if (!isLastClick) return
@@ -915,8 +917,24 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
 
         player.setPosAndPrevPos(pos)
 
+        // Modify bounding box for closest point targeting with improved stability
+        var targetBoundingBox = boundingBox
+        if (prioritizeClosestPoint) {
+            val closestPoint = getClosestPointOnBoundingBox(player.eyes, boundingBox)
+            // Create a larger, more stable bounding box around the closest point
+            val offset = 0.5  // Increased offset for better stability
+            targetBoundingBox = AxisAlignedBB(
+                (closestPoint.xCoord - offset).coerceIn(boundingBox.minX, boundingBox.maxX),
+                (closestPoint.yCoord - offset).coerceIn(boundingBox.minY, boundingBox.maxY),
+                (closestPoint.zCoord - offset).coerceIn(boundingBox.minZ, boundingBox.maxZ),
+                (closestPoint.xCoord + offset).coerceIn(boundingBox.minX, boundingBox.maxX),
+                (closestPoint.yCoord + offset).coerceIn(boundingBox.minY, boundingBox.maxY),
+                (closestPoint.zCoord + offset).coerceIn(boundingBox.minZ, boundingBox.maxZ)
+            )
+        }
+
         val rotation = searchCenter(
-            boundingBox,
+            targetBoundingBox,
             generateSpotBasedOnDistance,
             outBorder && !attackTimer.hasTimePassed(attackDelay / 2),
             randomization,
@@ -930,15 +948,49 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
 
         if (rotation == null) {
             player.setPosAndPrevPos(currPos, oldPos)
-
             return false
         }
 
-        setTargetRotation(rotation, options = options)
+        // Apply rotation mode
+        val finalRotation = when (rotationMode) {
+            "Basic", "Smooth", "Legit" -> rotation
+            "Bezier" -> bezierRotationTo(
+                rotation,
+                currentRotation ?: player.rotation,
+                bezierFactor,
+                bezierFactor
+            )
+
+            else -> rotation
+        }
+
+        // Apply rotation randomization
+        val randomizedRotation = if (rotationRandomization > 0f) {
+            val yawRand = (Math.random() * rotationRandomization * 2 - rotationRandomization).toFloat()
+            val pitchRand = (Math.random() * rotationRandomization * 2 - rotationRandomization).toFloat()
+            Rotation(finalRotation.yaw + yawRand, finalRotation.pitch + pitchRand)
+        } else {
+            finalRotation
+        }
+
+        setTargetRotation(randomizedRotation, options = options)
 
         player.setPosAndPrevPos(currPos, oldPos)
 
         return true
+    }
+
+    /**
+     * Get the closest point on the bounding box to the player's eyes with improved accuracy
+     */
+    private fun getClosestPointOnBoundingBox(eyes: Vec3, boundingBox: AxisAlignedBB): Vec3 {
+        // Calculate the closest point on the bounding box to the player's eyes
+        // This method clamps the eye position to the bounding box boundaries for more accurate results
+        val closestX = eyes.xCoord.coerceIn(boundingBox.minX, boundingBox.maxX)
+        val closestY = eyes.yCoord.coerceIn(boundingBox.minY, boundingBox.maxY)
+        val closestZ = eyes.zCoord.coerceIn(boundingBox.minZ, boundingBox.maxZ)
+
+        return Vec3(closestX, closestY, closestZ)
     }
 
     private fun ticksSinceClick() = runTimeTicks - (attackTickTimes.lastOrNull()?.second ?: 0)
@@ -1326,7 +1378,109 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
 
     val isBlockingChestAura
         get() = handleEvents() && target != null
-}
+    private fun bezierRotationTo(
+        targetRotation: Rotation,
+        currentRotation: Rotation,
+        yawStep: Float,
+        pitchStep: Float
+    ): Rotation {
+        val normalizedCurrentYaw = MathHelper.wrapAngleTo180_float(currentRotation.yaw)
+        val normalizedTargetYaw = MathHelper.wrapAngleTo180_float(targetRotation.yaw)
 
+        val yawIncrement = getYawDifference(normalizedCurrentYaw, normalizedTargetYaw)
+        val pitchIncrement = getPitchDifference(currentRotation.pitch, targetRotation.pitch)
+
+        // 创建控制点
+        val control1 = Rotation(
+            normalizedCurrentYaw + Math.random().toFloat() * yawIncrement,
+            currentRotation.pitch + Math.random().toFloat() * pitchIncrement
+        )
+
+        val control2 = Rotation(
+            normalizedCurrentYaw + Math.random().toFloat() * yawIncrement,
+            currentRotation.pitch + Math.random().toFloat() * pitchIncrement
+        )
+
+        val control3 = Rotation(
+            normalizedCurrentYaw + Math.random().toFloat() * yawIncrement,
+            currentRotation.pitch + Math.random().toFloat() * pitchIncrement
+        )
+
+        val yawFactor = min(yawStep, 1.0f)
+        val pitchFactor = min(pitchStep, 1.0f)
+
+        val smoothYawFactor = bezierBlend(yawFactor)
+        val smoothPitchFactor = bezierBlend(pitchFactor)
+
+        val newRotation = bezierInterpolate(
+            Rotation(normalizedCurrentYaw, currentRotation.pitch),
+            control1,
+            control2,
+            control3,
+            Rotation(normalizedTargetYaw, targetRotation.pitch),
+            smoothYawFactor,
+            smoothPitchFactor
+        )
+
+        val yawOutput = newRotation.yaw - normalizedCurrentYaw
+        val pitchOutput = newRotation.pitch - currentRotation.pitch
+
+        return Rotation(
+            currentRotation.yaw + yawOutput,
+            currentRotation.pitch + pitchOutput
+        )
+    }
+    private fun bezierBlend(t: Float): Float {
+        return t * t * (3 - 2 * t)
+    }
+    private fun quarticBezier(t: Float, p0: Float, p1: Float, p2: Float, p3: Float, p4: Float): Float {
+        val u = 1 - t
+        return p0 * u * u * u * u +
+                4 * p1 * t * u * u * u +
+                6 * p2 * t * t * u * u +
+                4 * p3 * t * t * t * u +
+                p4 * t * t * t * t
+    }
+    private fun bezierInterpolate(
+        start: Rotation,
+        control1: Rotation,
+        control2: Rotation,
+        control3: Rotation,
+        end: Rotation,
+        yawT: Float,
+        pitchT: Float
+    ): Rotation {
+        return Rotation(
+            start.yaw + quarticBezier(
+                yawT,
+                0f,
+                getYawDifference(start.yaw, control1.yaw),
+                getYawDifference(start.yaw, control2.yaw),
+                getYawDifference(start.yaw, control3.yaw),
+                getYawDifference(start.yaw, end.yaw)
+            ),
+            quarticBezier(
+                pitchT,
+                start.pitch,
+                control1.pitch,
+                control2.pitch,
+                control3.pitch,
+                end.pitch
+            )
+        )
+    }
+    private fun getYawDifference(startYaw: Float, endYaw: Float): Float {
+        var deltaYaw = endYaw - startYaw
+        if (abs(deltaYaw) > 180) {
+            deltaYaw = (deltaYaw + 360) % 360
+            if (deltaYaw > 180) deltaYaw -= 360
+        }
+        return deltaYaw
+    }
+
+    private fun getPitchDifference(startPitch: Float, endPitch: Float): Float {
+        return endPitch - startPitch
+    }
+}
 data class SwingFailData(val vec3: Vec3, val startTime: Long)
 
