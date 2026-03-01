@@ -128,6 +128,7 @@ object ModuleManager : Listenable, Collection<Module> by MODULE_REGISTRY {
             Kick,
             KillAura,
             WaterMark,
+            WaterMark2,
             LiquidWalk,
             LongJump,
             Liquids,
