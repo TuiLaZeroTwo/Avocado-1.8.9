@@ -430,11 +430,12 @@ object Velocity : Module("Velocity", Category.COMBAT) {
                 }
             }
             "intave14" -> {
-                when (thePlayer.hurtTime) {
-                    9 -> mc.timer.timerSpeed = intave14Timer1
-                    in 3..8 -> mc.timer.timerSpeed = intave14Timer2
-                    2 -> mc.timer.timerSpeed = 1.0f
-                    else -> mc.timer.timerSpeed = 1.0f
+                if (thePlayer.hurtTime > 0) {
+                    when (thePlayer.hurtTime) {
+                        9 -> mc.timer.timerSpeed = intave14Timer1
+                        in 3..8 -> mc.timer.timerSpeed = intave14Timer2
+                        else -> mc.timer.timerSpeed = 1.0f
+                    }
                 }
             }
             "intave/polar-flag" -> {

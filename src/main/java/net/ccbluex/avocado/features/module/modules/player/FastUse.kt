@@ -40,9 +40,10 @@ object FastUse : Module("FastUse", Category.PLAYER) {
     val onUpdate = handler<UpdateEvent> {
         val thePlayer = mc.thePlayer ?: return@handler
 
-        if (usedTimer) {
+        if (usedTimer || shouldResetTimer) {
             mc.timer.timerSpeed = 1F
             usedTimer = false
+            shouldResetTimer = false
         }
 
         if (!isConsumingItem()) {
