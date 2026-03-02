@@ -14,7 +14,6 @@ import net.minecraft.client.gui.GuiButton
 import net.minecraft.client.gui.GuiScreen
 import net.minecraft.client.gui.GuiSlot
 import org.lwjgl.input.Keyboard
-import org.lwjgl.opengl.GL11.*
 import java.awt.Color
 
 class GuiContributors(private val prevGui: GuiScreen) : AbstractScreen() {
@@ -42,22 +41,26 @@ class GuiContributors(private val prevGui: GuiScreen) : AbstractScreen() {
             if (credits.isNotEmpty()) {
                 val credit = credits[list.selectedSlot]
 
-                var y = 50
-                val x = width / 4 + 10
-
-                Fonts.fontSemibold40.drawString("@${credit.name}", x.toFloat(), 50f, Color.WHITE.rgb, true)
+                val x = width / 4 + 15
+                var y = 60
 
                 Fonts.fontSemibold40.drawString(
-                    "${credit.commits} commits",
+                    "@${credit.name}",
                     x.toFloat(),
-                    70f,
-                    Color.LIGHT_GRAY.rgb,
+                    50f,
+                    Color.WHITE.rgb,
                     true
                 )
 
                 for (line in credit.contributions) {
-                    y += Fonts.fontSemibold40.fontHeight + 2
-                    Fonts.fontSemibold40.drawString(line, x.toFloat(), y.toFloat(), Color.WHITE.rgb, true)
+                    Fonts.fontSemibold40.drawString(
+                        line,
+                        x.toFloat(),
+                        y.toFloat(),
+                        Color.LIGHT_GRAY.rgb,
+                        true
+                    )
+                    y += Fonts.fontSemibold40.fontHeight + 4
                 }
             }
 
@@ -69,7 +72,12 @@ class GuiContributors(private val prevGui: GuiScreen) : AbstractScreen() {
             )
 
             if (credits.isEmpty()) {
-                Fonts.fontSemibold40.drawCenteredString("Loading...", width / 8f, height / 2f, Color.WHITE.rgb)
+                Fonts.fontSemibold40.drawCenteredString(
+                    "Loading...",
+                    width / 8f,
+                    height / 2f,
+                    Color.WHITE.rgb
+                )
                 drawLoadingCircle(width / 8f, height / 2f - 40)
             }
         }
@@ -86,7 +94,8 @@ class GuiContributors(private val prevGui: GuiScreen) : AbstractScreen() {
             Keyboard.KEY_ESCAPE -> mc.displayGuiScreen(prevGui)
             Keyboard.KEY_UP -> list.selectedSlot -= 1
             Keyboard.KEY_DOWN -> list.selectedSlot += 1
-            Keyboard.KEY_TAB -> list.selectedSlot += if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)) -1 else 1
+            Keyboard.KEY_TAB -> list.selectedSlot +=
+                if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)) -1 else 1
             else -> super.keyTyped(typedChar, keyCode)
         }
     }
@@ -100,7 +109,6 @@ class GuiContributors(private val prevGui: GuiScreen) : AbstractScreen() {
         credits = listOf(
             Credit(
                 "1zun4",
-                100,
                 listOf(
                     "Owner of LiquidBounce",
                     "Main Developer",
@@ -109,23 +117,26 @@ class GuiContributors(private val prevGui: GuiScreen) : AbstractScreen() {
             ),
             Credit(
                 "CCBlueX",
-                5000,
                 listOf(
                     "Creator of LiquidBounce",
-                    "Base framework"
+                    "Base Framework"
                 )
             ),
             Credit(
                 "BeoPhiMan",
-                300,
                 listOf(
                     "Combat Improvements",
                     "Bug Fixes"
                 )
             ),
             Credit(
+                "Frenda",
+                listOf(
+                    "Launcher Development"
+                )
+            ),
+            Credit(
                 "TLZ",
-                200,
                 listOf(
                     "Client Optimization",
                     "Testing"
@@ -166,9 +177,10 @@ class GuiContributors(private val prevGui: GuiScreen) : AbstractScreen() {
             mouseY: Int
         ) {
             val credit = credits[entryID]
+
             Fonts.fontSemibold40.drawCenteredString(
                 credit.name,
-                width / 2F,
+                width / 8F,
                 y + 3F,
                 Color.WHITE.rgb,
                 true
@@ -181,6 +193,5 @@ class GuiContributors(private val prevGui: GuiScreen) : AbstractScreen() {
 
 private class Credit(
     val name: String,
-    val commits: Int,
     val contributions: List<String>
 )

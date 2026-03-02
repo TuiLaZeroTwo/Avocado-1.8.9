@@ -175,6 +175,7 @@ Avocado Client is based on the foundation of **LiquidBounce b100**.
 ### Main Development & Direction
 - BeoPhiMan
 - TLZ
+- Frenda
 
 Special thanks to the original LiquidBounce developers for the base architecture and mixin framework.
 
