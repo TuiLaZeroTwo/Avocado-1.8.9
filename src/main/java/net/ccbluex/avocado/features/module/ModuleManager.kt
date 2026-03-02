@@ -134,6 +134,7 @@ object ModuleManager : Listenable, Collection<Module> by MODULE_REGISTRY {
             LongJump,
             Liquids,
             LegitReach,
+            LagRange,
             MidClick,
             MoreCarry,
             MultiActions,
