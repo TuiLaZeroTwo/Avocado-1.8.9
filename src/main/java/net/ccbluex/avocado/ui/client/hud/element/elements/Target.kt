@@ -25,6 +25,7 @@ import net.ccbluex.avocado.utils.render.RenderUtils.drawRoundedRect
 import net.ccbluex.avocado.utils.render.RenderUtils.withClipping
 import net.ccbluex.avocado.utils.render.animation.AnimationUtil
 import net.ccbluex.avocado.utils.render.shader.shaders.RainbowShader
+import net.ccbluex.avocado.utils.GlowUtils
 import net.minecraft.client.gui.GuiChat
 import net.minecraft.entity.Entity
 import net.minecraft.entity.EntityLivingBase
@@ -40,6 +41,10 @@ import kotlin.math.pow
  */
 @ElementInfo(name = "Target")
 class Target : Element("Target") {
+
+    private val boxGlow by boolean("BoxGlow", true)
+    private val boxGlowRadius by int("BoxGlowRadius", 16, 4..40) { boxGlow }
+    private val boxGlowAlpha by int("BoxGlowAlpha", 200, 0..255) { boxGlow }
 
     private val roundedRectRadius by float("Rounded-Radius", 3F, 0F..5F)
 
@@ -198,6 +203,16 @@ class Target : Element("Target") {
                             if (backgroundMode == "Rainbow") 0 else backgroundCustomColor,
                             borderCustomColor,
                             roundedRectRadius
+                        )
+                    }
+                    if (boxGlow) {
+                        GlowUtils.drawGlow(
+                            0f,
+                            0f,
+                            width,
+                            height,
+                            boxGlowRadius,
+                            Color(0, 0, 0, boxGlowAlpha)
                         )
                     }
 
