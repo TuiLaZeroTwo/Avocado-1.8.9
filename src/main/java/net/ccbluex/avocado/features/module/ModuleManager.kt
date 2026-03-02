@@ -163,6 +163,7 @@ object ModuleManager : Listenable, Collection<Module> by MODULE_REGISTRY {
             Reach,
             Refill,
             Regen,
+            RiseNameTags,
             ResourcePackSpoof,
             ReverseStep,
             Rotations,
