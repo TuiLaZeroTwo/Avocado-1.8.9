@@ -299,7 +299,7 @@ object KillAura : Module("KillAura", Category.COMBAT, Keyboard.KEY_R) {
     ).subjective()
 
     // Visuals
-    private val mark by choices("Mark", arrayOf("None", "Platform", "Box", "Circle"), "Circle").subjective()
+    private val mark by choices("Mark", arrayOf("None", "Platform", "Box", "Circle"), "None").subjective()
     private val fakeSharp by boolean("FakeSharp", true).subjective()
     private val renderAimPointBox by boolean("RenderAimPointBox", false).subjective()
     private val aimPointBoxColor by color("AimPointBoxColor", Color.CYAN) { renderAimPointBox }.subjective()
