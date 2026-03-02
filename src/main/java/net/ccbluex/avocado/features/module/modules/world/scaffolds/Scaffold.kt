@@ -9,6 +9,7 @@ import net.ccbluex.avocado.event.*
 import net.ccbluex.avocado.event.async.loopSequence
 import net.ccbluex.avocado.features.module.Category
 import net.ccbluex.avocado.features.module.Module
+import net.ccbluex.avocado.features.module.modules.movement.Speed
 import net.ccbluex.avocado.utils.attack.CPSCounter
 import net.ccbluex.avocado.utils.block.*
 import net.ccbluex.avocado.utils.client.PacketUtils.sendPacket
@@ -19,6 +20,8 @@ import net.ccbluex.avocado.utils.inventory.SilentHotbar
 import net.ccbluex.avocado.utils.inventory.hotBarSlot
 import net.ccbluex.avocado.utils.kotlin.RandomUtils
 import net.ccbluex.avocado.utils.movement.MovementUtils
+import net.ccbluex.avocado.utils.movement.MovementUtils.speed
+import net.ccbluex.avocado.utils.movement.MovementUtils.strafe
 import net.ccbluex.avocado.utils.render.RenderUtils
 import net.ccbluex.avocado.utils.rotation.PlaceRotation
 import net.ccbluex.avocado.utils.rotation.Rotation
@@ -164,6 +167,8 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
     // Search options
     val searchMode by choices("SearchMode", arrayOf("Area", "Center"), "Area") { scaffoldMode != "GodBridge" }
     private val minDist by float("MinDist", 0f, 0f..0.2f) { scaffoldMode !in arrayOf("GodBridge", "Telly") }
+    private val autoJump by boolean("Autojump", false)
+    private val matrixAutoJump by boolean("MatrixAutoJump", false)
 
     // Zitter
     private val zitterMode by choices("Zitter", arrayOf("Off", "Teleport", "Smooth"), "Off")
@@ -433,6 +438,41 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
             ticksUntilJump = 0
             jumpTicks = jumpTicksRange.random()
+        }
+        if (matrixAutoJump && player.onGround && player.isMoving) {
+            if (player.isInWater || player.isInLava || player.isOnLadder || player.isInWeb) return@handler
+            if (Speed.matrixLowHop) {
+                try {
+                    player.jumpMovementFactor = 0.026f
+                } catch (_: Throwable) {  }
+            }
+
+            player.tryJump()
+
+            val lowHopAdjust = if (Speed.matrixLowHop) 0.00348 else 0.0
+            try {
+                player.motionY = 0.42 - lowHopAdjust
+            } catch (_: Throwable) {
+            }
+
+            try {
+                val groundSpeed = if (!handleEvents()) speed + Speed.extraGroundBoost else speed
+                strafe(groundSpeed)
+            } catch (_: Throwable) { /* ignore */ }
+
+            try {
+                player.speedInAir = if (player.fallDistance <= 0.4 && player.moveStrafing == 0f) {
+                    0.02035f
+                } else {
+                    0.02f
+                }
+            } catch (_: Throwable) { /* ignore */ }
+
+            return@handler
+        }
+
+        if (autoJump && player.onGround && player.isMoving) {
+            player.tryJump()
         }
     }
 

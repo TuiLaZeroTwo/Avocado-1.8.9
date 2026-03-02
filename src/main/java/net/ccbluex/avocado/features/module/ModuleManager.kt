@@ -18,7 +18,6 @@ import net.ccbluex.avocado.features.module.modules.render.*
 import net.ccbluex.avocado.features.module.modules.world.*
 import net.ccbluex.avocado.features.module.modules.world.Timer
 import net.ccbluex.avocado.features.module.modules.world.scaffolds.Scaffold
-import net.ccbluex.avocado.features.module.modules.world.scaffolds.Scaffold2
 import net.ccbluex.avocado.utils.client.ClientUtils.LOGGER
 import java.util.*
 
@@ -170,7 +169,6 @@ object ModuleManager : Listenable, Collection<Module> by MODULE_REGISTRY {
             Rotations,
             SafeWalk,
             Scaffold,
-            Scaffold2,
             ServerCrasher,
             Sneak,
             Spammer,
