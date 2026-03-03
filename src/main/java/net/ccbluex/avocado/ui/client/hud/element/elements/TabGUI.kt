@@ -23,6 +23,7 @@ import net.ccbluex.avocado.utils.render.RenderUtils.drawRoundedBorder
 import net.ccbluex.avocado.utils.render.RenderUtils.drawRoundedRect
 import net.ccbluex.avocado.utils.render.RenderUtils.withClipping
 import net.ccbluex.avocado.utils.render.shader.shaders.RainbowShader
+import net.ccbluex.avocado.utils.GlowUtils
 import net.minecraft.client.gui.FontRenderer
 import org.lwjgl.input.Keyboard
 import org.lwjgl.opengl.GL11.glColor4f
@@ -31,6 +32,10 @@ import kotlin.math.abs
 
 @ElementInfo(name = "TabGUI")
 class TabGUI(x: Double = 16.0, y: Double = 43.0) : Element("TabGUI", x = x, y = y) {
+
+    private val glow by boolean("Glow", true)
+    private val glowRadius by int("GlowRadius", 15, 4..50) { glow }
+    private val glowAlpha by int("GlowAlpha", 120, 0..255) { glow }
 
     private val rectColor = color("RectangleColor", Color(0, 0, 0, 140))
 
@@ -133,6 +138,20 @@ class TabGUI(x: Double = 16.0, y: Double = 43.0) : Element("TabGUI", x = x, y = 
 
         AWTFontRenderer.assumeNonVolatile {
             val rectColor = if (rectRainbow) Color.black else rectColor.selectedColor()
+
+            if (glow) {
+                val glowWidth = widthWithPadding - 2F
+                val glowHeight = guiHeight
+
+                GlowUtils.drawGlow(
+                    2F,
+                    0F,
+                    glowWidth,
+                    glowHeight,
+                    glowRadius,
+                    bgColor.withAlpha(glowAlpha)
+                )
+            }
 
             withClipping(main = {
                 drawRoundedRect(
@@ -376,6 +395,17 @@ class TabGUI(x: Double = 16.0, y: Double = 43.0) : Element("TabGUI", x = x, y = 
             menuWidth = maxWidth
 
             val menuHeight = modules.size * tabHeight
+
+            if (glow) {
+                GlowUtils.drawGlow(
+                    x - 1F,
+                    y - 1F,
+                    menuWidth - 1F,
+                    menuHeight,
+                    glowRadius,
+                    Color(backgroundColor).withAlpha(glowAlpha)
+                )
+            }
 
             withClipping(main = {
                 drawRoundedRect(

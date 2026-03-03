@@ -52,13 +52,14 @@ object HUD : MinecraftInstance {
     /** Create default HUD */
     fun setDefault() {
         elements.clear()
-
         addElement(Text.defaultClientTitle())
         addElement(Text.defaultClientVersion())
         addElement(Text.defaultBlockCount())
         addElement(Arraylist())
         addElement(ScoreboardElement())
         addElement(Armor())
+        addElement(TabGUI())
+        addElement(Keystrokes())
         //addElement(Effects())
         //addElement(Notifications())
         //addElement(Keystrokes())

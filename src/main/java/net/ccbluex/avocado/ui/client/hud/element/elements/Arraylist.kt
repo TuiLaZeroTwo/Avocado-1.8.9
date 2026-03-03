@@ -49,7 +49,7 @@ class Arraylist(
         "Text-Mode", arrayOf("Custom", "Fade", "Random", "Rainbow", "Gradient"), "Custom"
     )
     private val textColors = ColorSettingsInteger(this, "TextColor") { textColorMode == "Custom" }
-        .with(Color(255, 0, 0))
+        .with(Color(255, 255, 255))
     private val textFadeColors = ColorSettingsInteger(this, "Text-Fade") { textColorMode == "Fade" }.with(0, 111, 255)
 
     private val textFadeDistance by int("Text-Fade-Distance", 50, 0..100) { textColorMode == "Fade" }

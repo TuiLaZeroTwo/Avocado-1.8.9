@@ -39,6 +39,7 @@ import net.ccbluex.avocado.utils.render.shader.shaders.GradientShader
 import net.ccbluex.avocado.utils.render.shader.shaders.RainbowFontShader
 import net.ccbluex.avocado.utils.render.shader.shaders.RainbowShader
 import net.ccbluex.avocado.utils.render.toColorArray
+import net.ccbluex.avocado.utils.GlowUtils
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.inventory.GuiContainer
 import net.minecraft.client.gui.inventory.GuiInventory
@@ -83,7 +84,7 @@ class Text(x: Double = 10.0, y: Double = 10.0, scale: Float = 1F, side: Side = S
 
             text.displayString = "%clientName%"
             text.shadow = true
-            text.color = Color(255, 0, 0)
+            text.color = Color(255, 255, 255)
             text.font.set(Fonts.mc.fontRendererObj)
 
             return text
@@ -111,15 +112,18 @@ class Text(x: Double = 10.0, y: Double = 10.0, scale: Float = 1F, side: Side = S
 
             text.displayString = "%blockamount%"
             text.shadow = true
-            text.bgColors.with(Color.BLACK.withAlpha(128))
             text.onScaffold = true
             text.showBlock = true
             text.backgroundScale = 1F
+            text.font.set(Fonts.mc.fontRendererObj)
 
             return text
         }
 
     }
+    private val glow by boolean("Glow", true)
+    private val glowRadius by int("Glow-Radius", 8, 4..40) { glow }
+    private val glowAlpha by int("Glow-Alpha", 120, 0..255) { glow }
 
     private var onScaffold by boolean("ScaffoldOnly", false)
     private var showBlock by boolean("ShowBlock", false)
@@ -325,6 +329,16 @@ class Text(x: Double = 10.0, y: Double = 10.0, scale: Float = 1F, side: Side = S
                     gradientOffset
                 ).use {
                     RainbowShader.begin(backgroundMode == "Rainbow", rainbowX, rainbowY, rainbowOffset).use {
+                        if (glow) {
+                            GlowUtils.drawGlow(
+                                rectPos[0],
+                                rectPos[1],
+                                rectPos[2] - rectPos[0],
+                                rectPos[3] - rectPos[1],
+                                glowRadius,
+                                Color(0, 0, 0, glowAlpha)
+                            )
+                        }
                         drawRoundedRect(
                             rectPos[0], rectPos[1], rectPos[2], rectPos[3],
                             when (backgroundMode) {

@@ -23,6 +23,7 @@ import net.ccbluex.avocado.utils.render.RenderUtils
 import net.ccbluex.avocado.utils.render.RenderUtils.deltaTime
 import net.ccbluex.avocado.utils.render.RenderUtils.drawRoundedBorder
 import net.ccbluex.avocado.utils.render.RenderUtils.drawRoundedRect
+import net.ccbluex.avocado.utils.GlowUtils
 import net.minecraft.util.ResourceLocation
 import java.awt.Color
 
@@ -33,6 +34,10 @@ import java.awt.Color
 class Notifications(
     x: Double = 0.0, y: Double = 30.0, scale: Float = 1F, side: Side = Side(Side.Horizontal.RIGHT, Side.Vertical.DOWN)
 ) : Element("Notifications", x, y, scale, side) {
+
+    val glow by boolean("Glow", true)
+    val glowRadius by int("GlowRadius", 10, 4..40) { glow }
+    val glowAlpha by int("GlowAlpha", 120, 0..255) { glow }
 
     val horizontalFade by choices("HorizontalFade", arrayOf("InOnly", "OutOnly", "Both", "None"), "OutOnly")
     val padding by int("Padding", 5, 1..20)
@@ -170,14 +175,40 @@ class Notification(
             else -> x
         }
 
-        drawRoundedRect(0F, -y - MAX_HEIGHT, -currentX - extraSpace, -y, element.color.rgb, element.roundRadius)
+        val left = 0F
+        val top = -y - MAX_HEIGHT
+        val right = -currentX - extraSpace
+        val bottom = -y
+
+        val width = kotlin.math.abs(right - left)
+        val height = kotlin.math.abs(bottom - top)
+        if (element.glow) {
+            val glowX = right
+            val glowY = top
+            GlowUtils.drawGlow(
+                glowX,
+                glowY,
+                width,
+                height,
+                element.glowRadius,
+                Color(0, 0, 0, element.glowAlpha)
+            )
+        }
+        drawRoundedRect(
+            left,
+            top,
+            right,
+            bottom,
+            element.color.rgb,
+            element.roundRadius
+        )
 
         if (element.renderBorder) {
             drawRoundedBorder(
-                0F,
-                -y - MAX_HEIGHT,
-                -currentX - extraSpace,
-                -y,
+                left,
+                top,
+                right,
+                bottom,
                 element.borderWidth,
                 element.borderColor.rgb,
                 element.roundRadius

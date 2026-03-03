@@ -17,12 +17,13 @@ object WaterMark2 : Module("WaterMark2", Category.RENDER) {
     init {
         state = true
     }
+    private val textColor by color("AccentColor", Color(255, 30, 0))
+    private val textShadow by boolean("TextShadow", true)
+    private val enableGlow by boolean("Glow", true)
 
     private val bgAlpha = 130
     private val radius = 16f
-
-    private val accent = Color(255, 30, 0)
-    private val glow = Color(0, 0, 0, 150)
+    private val glowColor = Color(0, 0, 0, 150)
 
     val onRender2D = handler<Render2DEvent> {
 
@@ -45,20 +46,33 @@ object WaterMark2 : Module("WaterMark2", Category.RENDER) {
         drawBackground(x, y, width, height)
 
         val textY = y + (height - font.FONT_HEIGHT) / 2f
-
         val startX = x + 12f
 
-        font.drawString("Avocado", startX, textY, accent.rgb)
+        val accentRGB = textColor.rgb
+        font.drawString(
+            "Avocado",
+            startX,
+            textY,
+            accentRGB,
+            textShadow
+        )
 
         val part1 = "  ·  $username  ·  "
-        font.drawString(part1, startX + font.getStringWidth("Avocado"), textY, -1)
+        font.drawString(
+            part1,
+            startX + font.getStringWidth("Avocado"),
+            textY,
+            -1,
+            textShadow
+        )
 
         val part2 = "${ping}ms"
         font.drawString(
             part2,
             startX + font.getStringWidth("Avocado$part1"),
             textY,
-            accent.rgb
+            accentRGB,
+            textShadow
         )
 
         val rest = " to $server  ·  ${fps}fps"
@@ -66,20 +80,24 @@ object WaterMark2 : Module("WaterMark2", Category.RENDER) {
             rest,
             startX + font.getStringWidth("Avocado$part1$part2"),
             textY,
-            -1
+            -1,
+            textShadow
         )
     }
 
     private fun drawBackground(x: Float, y: Float, w: Float, h: Float) {
 
-        GlowUtils.drawGlow(
-            x,
-            y,
-            w,
-            h,
-            12,
-            glow
-        )
+        if (enableGlow) {
+            GlowUtils.drawGlow(
+                x,
+                y,
+                w,
+                h,
+                12,
+                glowColor
+            )
+        }
+
         drawRoundedRect(
             x,
             y,

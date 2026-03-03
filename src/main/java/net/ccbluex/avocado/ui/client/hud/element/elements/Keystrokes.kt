@@ -16,11 +16,16 @@ import net.ccbluex.avocado.utils.render.ColorSettingsInteger
 import net.ccbluex.avocado.utils.render.ColorUtils
 import net.ccbluex.avocado.utils.render.RenderUtils
 import net.ccbluex.avocado.utils.render.RenderUtils.withOutline
+import net.ccbluex.avocado.utils.GlowUtils
+import net.ccbluex.avocado.utils.render.ColorUtils.withAlpha
 import java.awt.Color
 import kotlin.math.nextDown
 
 @ElementInfo(name = "Keystrokes")
-class Keystrokes : Element("Keystrokes", 2.0, 34.0) {
+class Keystrokes : Element("Keystrokes", 2.0, 180.0) {
+    private val glow by boolean("Glow", true)
+    private val glowRadius by int("GlowRadius", 10, 4..40) { glow }
+    private val glowAlpha by int("GlowAlpha", 120, 0..255) { glow }
     private val radius by float("RectangleRound-Radius", 0F, 0F..10F)
     private val textColors = ColorSettingsInteger(this, "Text", applyMax = true)
     private val rectColors = ColorSettingsInteger(this, "Rectangle").with(a = 150)
@@ -129,6 +134,20 @@ class Keystrokes : Element("Keystrokes", 2.0, 34.0) {
             val adjustedStartX = startX + scaledPadding
             val adjustedEndX = endX - scaledPadding
             val adjustedY = currentY + scaledPadding
+
+            if (glow) {
+                val width = kotlin.math.abs(adjustedEndX - adjustedStartX)
+                val height = scaledBoxSize
+
+                GlowUtils.drawGlow(
+                    adjustedStartX,
+                    adjustedY,
+                    width,
+                    height,
+                    glowRadius,
+                    color.withAlpha(glowAlpha)
+                )
+            }
 
             RenderUtils.drawRoundedRect(
                 adjustedStartX, adjustedY, adjustedEndX, adjustedY + scaledBoxSize, color.rgb, radius
