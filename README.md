@@ -34,7 +34,7 @@ Avocado is developed and maintained by Vietnamese developers, aiming to deliver 
 
 ## Official Links
 
-Website: NONE  
+Website: https://avocadomc.github.io/downloads/ 
 YouTube: https://www.youtube.com/@beophiman  
 Discord: https://discord.gg/NnZabqafzh
 
