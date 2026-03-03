@@ -33,6 +33,7 @@ import net.ccbluex.avocado.utils.rotation.RotationUtils.getVectorForRotation
 import net.ccbluex.avocado.utils.rotation.RotationUtils.rotationDifference
 import net.ccbluex.avocado.utils.rotation.RotationUtils.setTargetRotation
 import net.ccbluex.avocado.utils.rotation.RotationUtils.toRotation
+import net.ccbluex.avocado.utils.rotation.RotationUtils.angleDifference
 import net.ccbluex.avocado.utils.simulation.SimulatedPlayer
 import net.ccbluex.avocado.utils.timing.*
 import net.minecraft.block.BlockBush
@@ -47,30 +48,24 @@ import net.minecraft.world.WorldSettings
 import net.minecraftforge.event.ForgeEventFactory
 import org.lwjgl.input.Keyboard
 import java.awt.Color
+import java.util.*
 import kotlin.math.*
+import kotlin.random.Random
 
-object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
+object Scaffold : Module("Scaffold", Category.WORLD) {
 
     /**
      * TOWER MODES & SETTINGS
      */
-
-    // -->
-
     private val towerMode by Tower.towerModeValues
 
     init {
         addValues(Tower.values)
     }
 
-    // <--
-
     /**
      * SCAFFOLD MODES & SETTINGS
      */
-
-    // -->
-
     val scaffoldMode by choices(
         "ScaffoldMode", arrayOf("Normal", "Rewinside", "Expand", "Telly", "GodBridge"), "Normal"
     )
@@ -157,12 +152,54 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
     // Rotation Options
     private val modeList =
-        choices("Rotations", arrayOf("Off", "Normal", "Stabilized", "ReverseYaw", "GodBridge"), "Normal")
+        choices("Rotations", arrayOf("Off", "Normal", "Stabilized", "ReverseYaw", "GodBridge", "AdvancedSpeed", "Dynamic"), "Normal")
 
     private val options = RotationSettingsWithRotationModes(this, modeList).apply {
         strictValue.excludeWithState()
         resetTicksValue.setSupport { it && scaffoldMode != "Telly" }
     }
+    private val advancedSpeedEnabled by boolean("AdvancedSpeed/Enabled", true) { modeList.get() == "AdvancedSpeed" }
+    private val yawSpeedBase by float("AdvancedSpeed/Yaw/Base", 30f, 1f..180f) { advancedSpeedEnabled }
+    private val yawSpeedUpRange by float("AdvancedSpeed/Yaw/UpRange", 10f, 0f..50f) { advancedSpeedEnabled }
+    private val yawSpeedDownRange by float("AdvancedSpeed/Yaw/DownRange", 10f, 0f..50f) { advancedSpeedEnabled }
+    private val yawSpeedUpChangeMax by float("AdvancedSpeed/Yaw/UpChangeMax", 30f, 0f..100f) { advancedSpeedEnabled }
+    private val yawSpeedDownChangeMax by float("AdvancedSpeed/Yaw/DownChangeMax", 30f, 0f..100f) { advancedSpeedEnabled }
+    private val yawSpeedBaseLargeRotation by float("AdvancedSpeed/Yaw/BaseLarge", 60f, 1f..180f) { advancedSpeedEnabled }
+    private val yawSpeedUpRangeLargeRotation by float("AdvancedSpeed/Yaw/UpRangeLarge", 20f, 0f..50f) { advancedSpeedEnabled }
+    private val yawSpeedDownRangeLargeRotation by float("AdvancedSpeed/Yaw/DownRangeLarge", 20f, 0f..50f) { advancedSpeedEnabled }
+    private val yawSpeedUpChangeMaxLargeRotation by float("AdvancedSpeed/Yaw/UpChangeMaxLarge", 50f, 0f..100f) { advancedSpeedEnabled }
+    private val yawSpeedDownChangeMaxLargeRotation by float("AdvancedSpeed/Yaw/DownChangeMaxLarge", 50f, 0f..100f) { advancedSpeedEnabled }
+    private val yawDeltaThresholdForLargeRotation by float("AdvancedSpeed/Yaw/DeltaThreshold", 30f, 5f..90f) { advancedSpeedEnabled }
+    private val yawOvershotRate by float("AdvancedSpeed/Yaw/OvershotRate", 0.2f, 0f..1f) { advancedSpeedEnabled }
+    private val pitchSpeedBase by float("AdvancedSpeed/Pitch/Base", 20f, 1f..90f) { advancedSpeedEnabled }
+    private val pitchSpeedUpRange by float("AdvancedSpeed/Pitch/UpRange", 5f, 0f..30f) { advancedSpeedEnabled }
+    private val pitchSpeedDownRange by float("AdvancedSpeed/Pitch/DownRange", 5f, 0f..30f) { advancedSpeedEnabled }
+    private val pitchSpeedUpChangeMax by float("AdvancedSpeed/Pitch/UpChangeMax", 15f, 0f..50f) { advancedSpeedEnabled }
+    private val pitchSpeedDownChangeMax by float("AdvancedSpeed/Pitch/DownChangeMax", 15f, 0f..50f) { advancedSpeedEnabled }
+
+    private val pitchSpeedBaseLargeRotation by float("AdvancedSpeed/Pitch/BaseLarge", 40f, 1f..90f) { advancedSpeedEnabled }
+    private val pitchSpeedUpRangeLargeRotation by float("AdvancedSpeed/Pitch/UpRangeLarge", 10f, 0f..30f) { advancedSpeedEnabled }
+    private val pitchSpeedDownRangeLargeRotation by float("AdvancedSpeed/Pitch/DownRangeLarge", 10f, 0f..30f) { advancedSpeedEnabled }
+    private val pitchSpeedUpChangeMaxLargeRotation by float("AdvancedSpeed/Pitch/UpChangeMaxLarge", 25f, 0f..50f) { advancedSpeedEnabled }
+    private val pitchSpeedDownChangeMaxLargeRotation by float("AdvancedSpeed/Pitch/DownChangeMaxLarge", 25f, 0f..50f) { advancedSpeedEnabled }
+
+    private val pitchDeltaThresholdForLargeRotation by float("AdvancedSpeed/Pitch/DeltaThreshold", 20f, 5f..60f) { advancedSpeedEnabled }
+    private val pitchOvershotRate by float("AdvancedSpeed/Pitch/OvershotRate", 0.15f, 0f..1f) { advancedSpeedEnabled }
+    private val dynamicEnabled by boolean("Dynamic/Enabled", true) { modeList.get() == "Dynamic" }
+    private val dynamicEffectSpeedBoost by boolean("Dynamic/Effect/SpeedBoost", true) { dynamicEnabled }
+    private val dynamicEffectSpeedReduction by boolean("Dynamic/Effect/SpeedReduction", false) { dynamicEnabled }
+    private val dynamicEffectJitter by boolean("Dynamic/Effect/Jitter", true) { dynamicEnabled }
+    private val dynamicEffectSmooth by boolean("Dynamic/Effect/Smooth", false) { dynamicEnabled }
+
+    private val dynamicDuration by intRange("Dynamic/Duration", 5..20, 1..100) { dynamicEnabled }
+    private val dynamicUpdateInterval by int("Dynamic/UpdateInterval", 2, 1..20) { dynamicEnabled }
+    private val dynamicSpeedBoostMultiplier by floatRange("Dynamic/SpeedBoostMultiplier", 1.5f..2.5f, 1f..5f) { dynamicEnabled }
+    private val dynamicSpeedReductionMultiplier by floatRange("Dynamic/SpeedReductionMultiplier", 0.3f..0.7f, 0.1f..1f) { dynamicEnabled }
+    private val dynamicSmoothMultiplier by floatRange("Dynamic/SmoothMultiplier", 0.5f..0.9f, 0.1f..1f) { dynamicEnabled }
+    private val dynamicJitterStrength by floatRange("Dynamic/JitterStrength", 0.5f..1.5f, 0.1f..3f) { dynamicEnabled }
+    private val dynamicSmoothFactor by floatRange("Dynamic/SmoothFactor", 0.2f..0.5f, 0.05f..1f) { dynamicEnabled }
+    private val dynamicMinMultiplier by float("Dynamic/MinMultiplier", 0.3f, 0.1f..1f) { dynamicEnabled }
+    private val dynamicMaxMultiplier by float("Dynamic/MaxMultiplier", 3f, 1f..10f) { dynamicEnabled }
 
     // Search options
     val searchMode by choices("SearchMode", arrayOf("Area", "Center"), "Area") { scaffoldMode != "GodBridge" }
@@ -201,6 +238,7 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
     // Visuals
     private val mark by boolean("Mark", false).subjective()
+    private val markColor by color("MarkColor", Color(68, 117, 255, 100)) { mark }
     private val trackCPS by boolean("TrackCPS", false).subjective()
 
     // Target placement
@@ -208,6 +246,15 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
     // Launch position
     private var launchY = -999
+    private var currentDynamicMultiplier = 1.0f
+    private var dynamicTicksRemaining = 0
+    private var lastUpdateTick = 0L
+    private var currentDynamicEffect = "SpeedBoost"
+    private var prevJitterYaw = 0f
+    private var prevJitterPitch = 0f
+    private var overshotCooldownYaw = 0
+    private var overshotCooldownPitch = 0
+    private var targetDynamicMultiplier = 1.0f
 
     val shouldJumpOnInput
         get() = !jumpOnUserInput || !mc.gameSettings.keyBindJump.isKeyDown && mc.thePlayer.posY >= launchY && !mc.thePlayer.onGround
@@ -227,9 +274,7 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
     // Eagle
     private var placedBlocksWithoutEagle = 0
-
     var eagleSneaking = false
-
     private var requestedStopSneak = false
 
     private val isEagleEnabled
@@ -250,30 +295,21 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
     // GodBridge
     private var blocksPlacedUntilJump = 0
-
     private val isManualJumpOptionActive
         get() = scaffoldMode == "GodBridge" && !jumpAutomatically
-
     private var blocksToJump = blocksToJumpRange.random()
-
     private val isGodBridgeEnabled
         get() = scaffoldMode == "GodBridge" || scaffoldMode == "Normal" && options.rotationMode == "GodBridge"
-
     private var godBridgeTargetRotation: Rotation? = null
 
     private val isLookingDiagonally: Boolean
         get() {
             val player = mc.thePlayer ?: return false
-
             val directionDegree = MovementUtils.direction.toDegreesF()
-
-            // Round the direction rotation to the nearest multiple of 45 degrees so that way we check if the player faces diagonally
             val yaw = round(abs(MathHelper.wrapAngleTo180_float(directionDegree)) / 45f) * 45f
-
             val isYawDiagonal = yaw % 90 != 0f
             val isMovingDiagonal = player.movementInput.moveForward != 0f && player.movementInput.moveStrafe == 0f
             val isStrafing = mc.gameSettings.keyBindRight.isKeyDown || mc.gameSettings.keyBindLeft.isKeyDown
-
             return isYawDiagonal && (isMovingDiagonal || isStrafing)
         }
 
@@ -286,14 +322,18 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
     private val shouldPlaceHorizontally
         get() = scaffoldMode == "Telly" && mc.thePlayer.isMoving && (startHorizontally && blocksUntilAxisChange <= horizontalPlacements || !startHorizontally && blocksUntilAxisChange > verticalPlacements)
 
-    // <--
-
     // Enabling module
     override fun onEnable() {
         val player = mc.thePlayer ?: return
-
         launchY = player.posY.roundToInt()
         blocksUntilAxisChange = 0
+        currentDynamicMultiplier = 1.0f
+        targetDynamicMultiplier = 1.0f
+        dynamicTicksRemaining = 0
+        prevJitterYaw = 0f
+        prevJitterPitch = 0f
+        overshotCooldownYaw = 0
+        overshotCooldownPitch = 0
     }
 
     // Events
@@ -303,6 +343,15 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
         if (mc.playerController.currentGameType == WorldSettings.GameType.SPECTATOR) return@loopSequence
 
         mc.timer.timerSpeed = timer
+        if (dynamicEnabled) {
+            val currentTick = System.currentTimeMillis() / 50
+            if (dynamicTicksRemaining <= 0 && currentTick - lastUpdateTick >= dynamicUpdateInterval) {
+                updateDynamicEffect()
+                lastUpdateTick = currentTick
+            }
+            dynamicTicksRemaining--
+            currentDynamicMultiplier += (targetDynamicMultiplier - currentDynamicMultiplier) * 0.15f
+        }
 
         // Telly
         if (player.onGround) ticksUntilJump++
@@ -359,7 +408,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
                     else -> true
                 }
 
-                // For better sneak support we could move this to MovementInputEvent
                 val pressedOnKeyboard = Keyboard.isKeyDown(options.keyBindSneak.keyCode)
 
                 var shouldEagle =
@@ -389,7 +437,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
                             )
                         )
 
-                        // Adjust speed when silent sneaking
                         if (adjustedSneakSpeed && shouldEagle) {
                             player.motionX *= eagleSpeed
                             player.motionZ *= eagleSpeed
@@ -421,9 +468,8 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
         }
 
         if (player.onGround) {
-            // Still a thing?
             if (scaffoldMode == "Rewinside") {
-                MovementUtils.strafe(0.2F)
+                strafe(0.2F)
                 player.motionY = 0.0
             }
         }
@@ -432,15 +478,16 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
     val onStrafe = handler<StrafeEvent> {
         val player = mc.thePlayer ?: return@handler
 
-        // Jumping needs to be done here, so it doesn't get detected by movement-sensitive anti-cheats.
         if (scaffoldMode == "Telly" && player.onGround && player.isMoving && currRotation == player.rotation && ticksUntilJump >= jumpTicks) {
             player.tryJump()
-
             ticksUntilJump = 0
             jumpTicks = jumpTicksRange.random()
+            return@handler
         }
+
         if (matrixAutoJump && player.onGround && player.isMoving) {
             if (player.isInWater || player.isInLava || player.isOnLadder || player.isInWeb) return@handler
+
             if (Speed.matrixLowHop) {
                 try {
                     player.jumpMovementFactor = 0.026f
@@ -452,13 +499,12 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
             val lowHopAdjust = if (Speed.matrixLowHop) 0.00348 else 0.0
             try {
                 player.motionY = 0.42 - lowHopAdjust
-            } catch (_: Throwable) {
-            }
+            } catch (_: Throwable) {}
 
             try {
                 val groundSpeed = if (!handleEvents()) speed + Speed.extraGroundBoost else speed
                 strafe(groundSpeed)
-            } catch (_: Throwable) { /* ignore */ }
+            } catch (_: Throwable) {}
 
             try {
                 player.speedInAir = if (player.fallDistance <= 0.4 && player.moveStrafing == 0f) {
@@ -466,7 +512,7 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
                 } else {
                     0.02f
                 }
-            } catch (_: Throwable) { /* ignore */ }
+            } catch (_: Throwable) {}
 
             return@handler
         }
@@ -495,15 +541,152 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
         if (!Tower.isTowering && isGodBridgeEnabled && options.rotationsActive) {
             generateGodBridgeRotations(ticks)
-
             return@handler
         }
 
         if (options.rotationsActive && rotation != null) {
             val placeRotation = this.placeRotation?.rotation ?: rotation
+            val targetRotation = placeRotation.copy()
+            val finalRotation = when (modeList.get()) {
+                "AdvancedSpeed" -> if (advancedSpeedEnabled) applyAdvancedSpeedRotation(rotation, targetRotation) else targetRotation
+                "Dynamic" -> if (dynamicEnabled) applyDynamicRotation(rotation, targetRotation) else targetRotation
+                else -> targetRotation
+            }
 
-            if (RotationUtils.resetTicks != 0 || options.keepRotation) {
-                setRotation(placeRotation, ticks)
+            setRotation(finalRotation, ticks)
+        }
+    }
+    private fun applyAdvancedSpeedRotation(current: Rotation, target: Rotation): Rotation {
+        val yawDiff = angleDifference(target.yaw, current.yaw)
+        val pitchDiff = target.pitch - current.pitch
+
+        val yawSpeed = if (abs(yawDiff) > yawDeltaThresholdForLargeRotation) {
+            val range = if (yawDiff > 0f) yawSpeedUpRangeLargeRotation else yawSpeedDownRangeLargeRotation
+            val changeMax = if (yawDiff > 0f) yawSpeedUpChangeMaxLargeRotation else yawSpeedDownChangeMaxLargeRotation
+            (yawSpeedBaseLargeRotation + (Random.nextFloat() * 2f - 1f) * range).coerceIn(
+                (yawSpeedBaseLargeRotation - changeMax).coerceAtLeast(0f),
+                yawSpeedBaseLargeRotation + changeMax
+            )
+        } else {
+            val range = if (yawDiff > 0f) yawSpeedUpRange else yawSpeedDownRange
+            val changeMax = if (yawDiff > 0f) yawSpeedUpChangeMax else yawSpeedDownChangeMax
+            (yawSpeedBase + (Random.nextFloat() * 2f - 1f) * range).coerceIn(
+                (yawSpeedBase - changeMax).coerceAtLeast(0f),
+                yawSpeedBase + changeMax
+            )
+        }
+
+        val pitchSpeed = if (abs(pitchDiff) > pitchDeltaThresholdForLargeRotation) {
+            val range = if (pitchDiff > 0f) pitchSpeedUpRangeLargeRotation else pitchSpeedDownRangeLargeRotation
+            val changeMax = if (pitchDiff > 0f) pitchSpeedUpChangeMaxLargeRotation else pitchSpeedDownChangeMaxLargeRotation
+            (pitchSpeedBaseLargeRotation + (Random.nextFloat() * 2f - 1f) * range).coerceIn(
+                (pitchSpeedBaseLargeRotation - changeMax).coerceAtLeast(0f),
+                pitchSpeedBaseLargeRotation + changeMax
+            )
+        } else {
+            val range = if (pitchDiff > 0f) pitchSpeedUpRange else pitchSpeedDownRange
+            val changeMax = if (pitchDiff > 0f) pitchSpeedUpChangeMax else pitchSpeedDownChangeMax
+            (pitchSpeedBase + (Random.nextFloat() * 2f - 1f) * range).coerceIn(
+                (pitchSpeedBase - changeMax).coerceAtLeast(0f),
+                pitchSpeedBase + changeMax
+            )
+        }
+
+        val limitedYaw = limitAngleChange(current.yaw, target.yaw, abs(yawSpeed))
+        val limitedPitch = limitAngleChange(current.pitch, target.pitch, abs(pitchSpeed))
+
+        val finalYaw = if (overshotCooldownYaw <= 0 && Random.nextFloat() < yawOvershotRate && abs(yawDiff) < 2f) {
+            overshotCooldownYaw = Random.nextInt(3, 8)
+            target.yaw + (Random.nextFloat() * 2f - 1f) * 1.5f
+        } else {
+            if (overshotCooldownYaw > 0) overshotCooldownYaw--
+            limitedYaw
+        }
+
+        val finalPitch = if (overshotCooldownPitch <= 0 && Random.nextFloat() < pitchOvershotRate && abs(pitchDiff) < 2f) {
+            overshotCooldownPitch = Random.nextInt(3, 8)
+            target.pitch + (Random.nextFloat() * 2f - 1f) * 1.0f
+        } else {
+            if (overshotCooldownPitch > 0) overshotCooldownPitch--
+            limitedPitch
+        }
+
+        return Rotation(finalYaw, finalPitch).fixedSensitivity()
+    }
+    private fun limitAngleChange(current: Float, target: Float, maxChange: Float): Float {
+        var diff = ((target - current) % 360 + 540) % 360 - 180
+        diff = diff.coerceIn(-maxChange, maxChange)
+        return current + diff
+    }
+    private fun updateDynamicEffect() {
+        val availableEffects = mutableListOf<String>()
+        if (dynamicEffectSpeedBoost) availableEffects.add("SpeedBoost")
+        if (dynamicEffectSpeedReduction) availableEffects.add("SpeedReduction")
+        if (dynamicEffectJitter) availableEffects.add("Jitter")
+        if (dynamicEffectSmooth) availableEffects.add("Smooth")
+
+        currentDynamicEffect = if (availableEffects.isNotEmpty()) {
+            availableEffects.random()
+        } else {
+            "SpeedBoost"
+        }
+
+        dynamicTicksRemaining = dynamicDuration.random()
+
+        targetDynamicMultiplier = when (currentDynamicEffect) {
+            "SpeedBoost" -> dynamicSpeedBoostMultiplier.random()
+            "SpeedReduction" -> dynamicSpeedReductionMultiplier.random()
+            "Jitter" -> 1.0f
+            "Smooth" -> dynamicSmoothMultiplier.random()
+            else -> 1.0f
+        }
+
+        targetDynamicMultiplier = targetDynamicMultiplier.coerceIn(dynamicMinMultiplier, dynamicMaxMultiplier)
+    }
+    private fun applyDynamicRotation(current: Rotation, target: Rotation): Rotation {
+        val baseHSpeed = yawSpeedBase
+        val baseVSpeed = pitchSpeedBase
+
+        val dynamicHSpeed = (baseHSpeed * currentDynamicMultiplier).coerceIn(1f, 180f)
+        val dynamicVSpeed = (baseVSpeed * currentDynamicMultiplier).coerceIn(1f, 90f)
+
+        val yawDiff = angleDifference(target.yaw, current.yaw)
+        val pitchDiff = target.pitch - current.pitch
+
+        return when (currentDynamicEffect) {
+            "Jitter" -> {
+                val jitterStrength = dynamicJitterStrength.random()
+                val rawJitterYaw = (Random.nextFloat() * 2f - 1f) * jitterStrength
+                val rawJitterPitch = (Random.nextFloat() * 2f - 1f) * jitterStrength
+                prevJitterYaw = prevJitterYaw * 0.4f + rawJitterYaw * 0.6f
+                prevJitterPitch = prevJitterPitch * 0.4f + rawJitterPitch * 0.6f
+
+                val randomYaw = if (yawDiff != 0f) {
+                    (dynamicHSpeed + prevJitterYaw).coerceIn(0f, abs(yawDiff))
+                } else 0f
+
+                val randomPitch = if (pitchDiff != 0f) {
+                    (dynamicVSpeed + prevJitterPitch).coerceIn(0f, abs(pitchDiff))
+                } else 0f
+
+                val finalYaw = current.yaw + if (yawDiff > 0f) randomYaw else -randomYaw
+                val finalPitch = current.pitch + if (pitchDiff > 0f) randomPitch else -randomPitch
+
+                Rotation(finalYaw, finalPitch).fixedSensitivity()
+            }
+            "Smooth" -> {
+                val smoothFactor = dynamicSmoothFactor.random()
+                val newYaw = current.yaw + yawDiff * smoothFactor
+                val newPitch = current.pitch + pitchDiff * smoothFactor
+                Rotation(
+                    if (abs(yawDiff) < 0.5f) target.yaw else newYaw,
+                    if (abs(pitchDiff) < 0.5f) target.pitch else newPitch
+                ).fixedSensitivity()
+            }
+            else -> {
+                val limitedYaw = limitAngleChange(current.yaw, target.yaw, dynamicHSpeed)
+                val limitedPitch = limitAngleChange(current.pitch, target.pitch, dynamicVSpeed)
+                Rotation(limitedYaw, limitedPitch).fixedSensitivity()
             }
         }
     }
@@ -513,11 +696,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
         val raycastProperly = !(scaffoldMode == "Expand" && expandLength > 1 || shouldGoDown) && options.rotationsActive
 
-        /**
-         * Calculate block raytracing process once to simulate proper vanilla ray-cast update logic.
-         *
-         * @see net.minecraft.client.Minecraft.runTick Line 1345
-         */
         val raycast = performBlockRaytrace(currRotation, mc.playerController.blockReachDistance)
 
         var alreadyPlaced = false
@@ -541,7 +719,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
             return@handler
         }
 
-        // Change/Schedule slot once per tick according to vanilla-logic
         if (alreadyPlaced || SilentHotbar.modifiedThisTick) {
             return@handler
         }
@@ -618,7 +795,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
         setTargetRotation(rotation, options, ticks)
     }
 
-    // Search for new target block
     private fun findBlock(expand: Boolean, area: Boolean) {
         val player = mc.thePlayer ?: return
 
@@ -685,7 +861,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
         var stack = player.hotBarSlot(currentSlot).stack
 
-        //TODO: blacklist more blocks than only bushes
         if (stack == null || stack.item !is ItemBlock || (stack.item as ItemBlock).block is BlockBush || stack.stackSize <= 0 || sortByHighestAmount || earlySwitch) {
             val blockSlot = if (sortByHighestAmount) {
                 InventoryUtils.findLargestBlockStackInHotbar() ?: return
@@ -698,7 +873,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
             stack = player.hotBarSlot(blockSlot).stack
 
-            // Check if block is placeable on target side before switching slots
             if ((stack.item as? ItemBlock)?.canPlaceBlockOnSide(
                     world, placeInfo.blockPos, placeInfo.enumFacing, player, stack
                 ) == false
@@ -715,7 +889,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
         if (autoBlock == "Switch") SilentHotbar.resetSlot(this, true)
 
-        // Since we violate vanilla slot switch logic if we send the packets now, we arrange them for the next tick
         findBlockToSwitchNextTick(stack)
 
         if (trackCPS) {
@@ -759,7 +932,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
         tryToPlaceBlock(stack, raytrace.blockPos, raytrace.sideHit, raytrace.hitVec, attempt = true) { onSuccess() }
 
-        // Since we violate vanilla slot switch logic if we send the packets now, we arrange them for the next tick
         if (lastClick) {
             findBlockToSwitchNextTick(stack)
         }
@@ -769,18 +941,12 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
         }
     }
 
-    // Disabling module
     override fun onDisable() {
         val player = mc.thePlayer ?: return
 
         if (!GameSettings.isKeyDown(mc.gameSettings.keyBindSneak)) {
             mc.gameSettings.keyBindSneak.pressed = false
             if (eagleSneaking && player.isSneaking) {
-                //sendPacket(C0BPacketEntityAction(player, C0BPacketEntityAction.Action.STOP_SNEAKING))
-
-                /**
-                 * Should prevent false flag by some AntiCheat (Ex: Verus)
-                 */
                 player.isSneaking = false
             }
         }
@@ -804,7 +970,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
         options.instant = false
     }
 
-    // Entity movement event
     val onMove = handler<MoveEvent> { event ->
         val player = mc.thePlayer ?: return@handler
 
@@ -821,18 +986,17 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
         if (!jumpStrafe) return@handler
 
         if (event.eventState == EventState.POST) {
-            MovementUtils.strafe(
+            strafe(
                 (if (!isLookingDiagonally) jumpStraightStrafe else jumpDiagonalStrafe).random()
             )
         }
     }
 
-    // Visuals
     val onRender3D = handler<Render3DEvent> {
         val player = mc.thePlayer ?: return@handler
 
         val shouldBother =
-            !(shouldGoDown || scaffoldMode == "Expand" && expandLength > 1) && extraClicks && (player.isMoving || MovementUtils.speed > 0.03)
+            !(shouldGoDown || scaffoldMode == "Expand" && expandLength > 1) && extraClicks && (player.isMoving || speed > 0.03)
 
         if (shouldBother) {
             currRotation.let {
@@ -866,20 +1030,11 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
             val placeInfo = PlaceInfo.get(blockPos)
 
             if (blockPos.isReplaceable && placeInfo != null) {
-                RenderUtils.drawBlockBox(blockPos, Color(68, 117, 255, 100), false)
+                RenderUtils.drawBlockBox(blockPos, markColor, false)
                 return@handler
             }
         }
     }
-
-    /**
-     * Search for placeable block
-     *
-     * @param blockPosition pos
-     * @param raycast visible
-     * @param area spot
-     * @return
-     */
 
     fun search(
         blockPosition: BlockPos,
@@ -923,9 +1078,9 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
                 placeRotation = compareDifferences(currPlaceRotation, placeRotation)
             } else {
-                for (x in 0.1..0.9) {
-                    for (y in 0.1..0.9) {
-                        for (z in 0.1..0.9) {
+                for (x in 0.1..0.9 step 0.1) {
+                    for (y in 0.1..0.9 step 0.1) {
+                        for (z in 0.1..0.9 step 0.1) {
                             currPlaceRotation =
                                 findTargetPlace(blockPosition, neighbor, Vec3(x, y, z), side, eyes, maxReach, raycast)
                                     ?: continue
@@ -940,26 +1095,29 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
         placeRotation ?: return false
 
         if (options.rotationsActive && !isGodBridgeEnabled) {
-            val rotationDifference = rotationDifference(placeRotation.rotation, currRotation)
-            val rotationDifference2 = rotationDifference(placeRotation.rotation / 90F, currRotation / 90F)
+            val rotDiff = rotationDifference(placeRotation.rotation, currRotation)
+            val rotDiff2 = rotationDifference(placeRotation.rotation / 90F, currRotation / 90F)
 
             val simPlayer = SimulatedPlayer.fromClientPlayer(player.movementInput)
             simPlayer.tick()
 
-            // We don't want to use block safe all the time, so we check if it's not needed.
             options.instant =
-                blockSafe && simPlayer.fallDistance > player.fallDistance + 0.05 && rotationDifference > rotationDifference2 / 2
+                blockSafe && simPlayer.fallDistance > player.fallDistance + 0.05 && rotDiff > rotDiff2 / 2
 
-            setRotation(placeRotation.rotation, if (scaffoldMode == "Telly") 1 else options.resetTicks)
+            val targetRotation = placeRotation.rotation.copy()
+            val finalRotation = when (modeList.get()) {
+                "AdvancedSpeed" -> if (advancedSpeedEnabled) applyAdvancedSpeedRotation(currRotation, targetRotation) else targetRotation
+                "Dynamic" -> if (dynamicEnabled) applyDynamicRotation(currRotation, targetRotation) else targetRotation
+                else -> targetRotation
+            }
+
+            setRotation(finalRotation, if (scaffoldMode == "Telly") 1 else options.resetTicks)
         }
 
         this.placeRotation = placeRotation
         return true
     }
 
-    /**
-     * For expand scaffold, fixes vector values that should match according to direction vector
-     */
     private fun modifyVec(original: Vec3, direction: EnumFacing, pos: Vec3, shouldModify: Boolean): Vec3 {
         if (!shouldModify) {
             return original
@@ -1015,7 +1173,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
             else -> rotation
         }.fixedSensitivity()
 
-        // If the current rotation already looks at the target block and side, then return right here
         performBlockRaytrace(currRotation, maxReach)?.let { raytrace ->
             if (raytrace.blockPos == offsetPos && (!raycast || raytrace.sideHit == side.opposite)) {
                 return PlaceRotation(
@@ -1067,7 +1224,7 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
     }
 
     private fun findBlockToSwitchNextTick(stack: ItemStack) {
-        if (autoBlock in arrayOf("Off", "Switch")) return
+        if (autoBlock !in arrayOf("Off", "Switch")) return
 
         val switchAmount = if (earlySwitch) amountBeforeSwitch else 0
 
@@ -1146,7 +1303,7 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
             return
         }
 
-        if (!slow && speedLimiter && MovementUtils.speed > speedLimit) {
+        if (!slow && speedLimiter && speed > speedLimit) {
             input.moveStrafe = 0f
             input.moveForward = 0f
             return
@@ -1172,7 +1329,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
                     }
 
                     if (!notOnGround && !input.jump) {
-                        // Attempt to move against the direction
                         input.moveStrafe = if (zitterDirection) 1f else -1f
                     } else {
                         input.moveStrafe = 0f
@@ -1180,7 +1336,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
                     zitterDirection = !zitterDirection
 
-                    // Recreate input in case the user was indeed pressing inputs
                     if (mc.gameSettings.keyBindLeft.isKeyDown) {
                         input.moveStrafe++
                     }
@@ -1206,7 +1361,7 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
             }
 
             "teleport" -> {
-                MovementUtils.strafe(zitterSpeed)
+                strafe(zitterSpeed)
                 val yaw = (player.rotationYaw + if (zitterDirection) 90.0 else -90.0).toRadians()
                 player.motionX -= sin(yaw) * zitterStrength
                 player.motionZ += cos(yaw) * zitterStrength
@@ -1217,11 +1372,6 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
     private var isOnRightSide = false
 
-    /**
-     * God-bridge rotation generation method from Nextgen
-     *
-     * Credits to @Ell1ott
-     */
     private fun generateGodBridgeRotations(ticks: Int) {
         val player = mc.thePlayer ?: return
 
@@ -1286,6 +1436,5 @@ object Scaffold : Module("Scaffold", Category.WORLD, Keyboard.KEY_I) {
 
     override val tag
         get() = if (towerMode != "None") ("$scaffoldMode | $towerMode") else scaffoldMode
-
     data class ExtraClickInfo(val delay: Int, val lastClick: Long, var clicks: Int)
 }
