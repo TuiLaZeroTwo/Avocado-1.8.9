@@ -57,7 +57,7 @@ object Velocity : Module("Velocity", Category.COMBAT) {
         "Mode", arrayOf(
             "Simple", "AAC", "AACPush", "AACZero", "AACv4",
             "Reverse", "SmoothReverse", "Jump", "Glitch", "Legit", "GrimCombat","Intave13KeepLow", "Intave13Reverse", "Intave13GommeZero", "Intave13Wall", "Intave13Old",
-            "GhostBlock", "Vulcan", "S32Packet", "MatrixReduce", "KeepY","Polar","Intave14", "intave/polar-flag","SmartJumpReset",
+            "GhostBlock", "Vulcan", "S32Packet", "MatrixReduce", "KeepY","Polar","Intave14", "intave/polar-flag","SmartJumpReset", "Intave14.3.3",
             "IntaveReduce", "PredictionA", "IntaveA", "IntaveB", "Delay", "GrimC03", "GrimC07", "Hypixel", "HypixelAir",
             "Click", "BlocksMC"
         ), "Simple"
@@ -267,6 +267,13 @@ object Velocity : Module("Velocity", Category.COMBAT) {
                 )
 
                 grimCanCancel = false
+            }
+            "intave14.3.3" -> {
+                if (mc.thePlayer.hurtTime == 10) {
+                    reduceXZ = -1.0
+                } else if (mc.thePlayer.hurtTime == 9 && mc.thePlayer.onGround) {
+                    reduceXZ = 0.9
+                }
             }
             "intave13keeplow" -> {
                 when (thePlayer.hurtTime) {
@@ -629,6 +636,13 @@ object Velocity : Module("Velocity", Category.COMBAT) {
             return@handler
 
         var entity = mc.objectMouseOver?.entityHit
+        if (mode == "Intave14.3.3") {
+            if (mc.thePlayer.hurtTime == 10) {
+                reduceXZ = -1.0
+            } else if (mc.thePlayer.hurtTime == 9 && mc.thePlayer.onGround) {
+                reduceXZ = 0.9
+            }
+        }
 
         if (entity == null) {
             if (whenFacingEnemyOnly) {
