@@ -135,17 +135,17 @@ class Keystrokes : Element("Keystrokes", 2.0, 180.0) {
             val adjustedEndX = endX - scaledPadding
             val adjustedY = currentY + scaledPadding
 
-            if (glow) {
+            if (glow && isPressed) {
                 val width = kotlin.math.abs(adjustedEndX - adjustedStartX)
                 val height = scaledBoxSize
 
                 GlowUtils.drawGlow(
-                    adjustedStartX,
-                    adjustedY,
-                    width,
-                    height,
+                    adjustedStartX - 2f,
+                    adjustedY - 2f,
+                    width + 4f,
+                    height + 4f,
                     glowRadius,
-                    color.withAlpha(glowAlpha)
+                    pressColor.withAlpha(glowAlpha)
                 )
             }
 
