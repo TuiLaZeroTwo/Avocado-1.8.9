@@ -219,7 +219,7 @@ object Scaffold : Module("Scaffold", Category.WORLD) {
     val timer by float("Timer", 1f, 0.1f..10f)
     private val speedModifier by float("SpeedModifier", 1f, 0f..2f)
     private val speedLimiter by boolean("SpeedLimiter", false) { !slow }
-    private val speedLimit by float("SpeedLimit", 0.11f, 0.01f..0.12f) { !slow && speedLimiter }
+    private val speedLimit by float("SpeedLimit", 0.11f, 0.01f..0.30f) { !slow && speedLimiter }
     private val slow by boolean("Slow", false)
     private val slowGround by boolean("SlowOnlyGround", false) { slow }
     private val slowSpeed by float("SlowSpeed", 0.6f, 0.2f..0.8f) { slow }
